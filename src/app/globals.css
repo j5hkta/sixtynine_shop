@@ -5,6 +5,14 @@
   --foreground: #171717;
 }
 
+/* Paleta de marca - Sixty Nine Skate & Apparel Store */
+@theme {
+  --color-ink: #0d0d0d;
+  --color-ink-soft: #141414;
+  --color-ink-line: #262626;
+  --color-neon: #ffe600;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
