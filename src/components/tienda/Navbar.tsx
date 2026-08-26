@@ -75,9 +75,8 @@ export default function Navbar() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 md:ml-0">
-          {/* TODO: falta la página del carrito; por ahora sólo muestra el total. */}
-          <button
-            type="button"
+          <Link
+            href="/carrito"
             aria-label={
               totalItems === 0
                 ? "Carrito de compras (vacío)"
@@ -94,7 +93,7 @@ export default function Navbar() {
                 {totalItems > 99 ? "99+" : totalItems}
               </span>
             )}
-          </button>
+          </Link>
 
           <button
             type="button"
