@@ -2,7 +2,14 @@ import Link from "next/link";
 import { AlertTriangle, ArrowRight } from "lucide-react";
 
 import ProductCard from "@/components/tienda/ProductCard";
-import { createClient } from "@/lib/supabase/server";
+import { createAnonClient } from "@/lib/supabase/anon";
+
+/**
+ * ISR: la página se sirve desde caché y, como mucho una vez cada 60 s, la
+ * primera visita tras expirar dispara la regeneración en segundo plano. Nadie
+ * espera por ella — quien llega recibe la versión anterior.
+ */
+export const revalidate = 60;
 
 export const metadata = {
   title: "Sixty Nine Skate & Apparel Store",
@@ -12,14 +19,34 @@ export const metadata = {
 
 const CAMPOS_TARJETA = "id, titulo, precio, categoria, imagenes";
 
+/**
+ * Con ISR la página se prerenderiza durante el `next build`, así que un fallo
+ * de Supabase (o unas credenciales sin configurar) tumbaría el build entero.
+ * Se degrada al estado de error que la página ya sabe pintar; la siguiente
+ * revalidación lo arregla sola en cuanto la base de datos responda.
+ */
+async function cargarUltimos() {
+  try {
+    const supabase = createAnonClient();
+    const { data, error } = await supabase
+      .from("productos")
+      .select(CAMPOS_TARJETA)
+      .eq("estado", "activo")
+      .order("creado_en", { ascending: false })
+      .limit(4);
+
+    if (error) throw error;
+
+    return { ultimos: data ?? [], error: null as string | null };
+  } catch (e) {
+    const mensaje = e instanceof Error ? e.message : "Error desconocido.";
+    console.error("[tienda] No se pudieron cargar los últimos ingresos:", mensaje);
+    return { ultimos: [], error: mensaje };
+  }
+}
+
 export default async function HomePage() {
-  const supabase = await createClient();
-  const { data: ultimos, error } = await supabase
-    .from("productos")
-    .select(CAMPOS_TARJETA)
-    .eq("estado", "activo")
-    .order("creado_en", { ascending: false })
-    .limit(4);
+  const { ultimos, error } = await cargarUltimos();
 
   return (
     <>
@@ -97,17 +124,17 @@ export default async function HomePage() {
             className="mt-10 flex items-start gap-2 border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-            No se pudo cargar el catálogo: {error.message}
+            No se pudo cargar el catálogo: {error}
           </p>
         )}
 
-        {!error && ultimos && ultimos.length === 0 && (
+        {!error && ultimos.length === 0 && (
           <p className="mt-10 border border-dashed border-ink-line bg-ink-soft px-6 py-16 text-center text-sm text-neutral-500">
             Todavía no hay productos publicados. Vuelve pronto.
           </p>
         )}
 
-        {ultimos && ultimos.length > 0 && (
+        {ultimos.length > 0 && (
           <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {ultimos.map((producto) => (
               <ProductCard key={producto.id} producto={producto} />

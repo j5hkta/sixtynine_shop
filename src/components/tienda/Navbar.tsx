@@ -5,6 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, ShoppingBag, X } from "lucide-react";
 
+import { useTotalItems } from "@/store/carrito";
+
 const ENLACES = [
   { href: "/", label: "Inicio" },
   { href: "/productos", label: "Catálogo" },
@@ -17,6 +19,10 @@ function esActivo(href: string, pathname: string): boolean {
 export default function Navbar() {
   const pathname = usePathname();
   const [abierto, setAbierto] = useState(false);
+
+  // Devuelve 0 hasta que termina la hidratación, para que el HTML del servidor
+  // y el primer render del cliente coincidan (ver `useTotalItems`).
+  const totalItems = useTotalItems();
 
   // Cierra el menú móvil al navegar. Se ajusta durante el render en lugar de
   // en un efecto para no provocar un render en cascada.
@@ -69,16 +75,25 @@ export default function Navbar() {
         </nav>
 
         <div className="ml-auto flex items-center gap-2 md:ml-0">
-          {/* TODO: el carrito todavía no existe; el contador queda en 0. */}
+          {/* TODO: falta la página del carrito; por ahora sólo muestra el total. */}
           <button
             type="button"
-            aria-label="Carrito de compras (vacío)"
+            aria-label={
+              totalItems === 0
+                ? "Carrito de compras (vacío)"
+                : `Carrito de compras (${totalItems} ${totalItems === 1 ? "artículo" : "artículos"})`
+            }
             className="relative border border-ink-line p-2.5 text-neutral-400 transition-colors hover:border-neon/50 hover:text-neon"
           >
             <ShoppingBag className="h-4 w-4" aria-hidden />
-            <span className="absolute -top-2 -right-2 flex h-4 min-w-4 items-center justify-center bg-neon px-1 font-mono text-[10px] font-black text-ink">
-              0
-            </span>
+            {totalItems > 0 && (
+              <span
+                aria-hidden
+                className="absolute -top-2 -right-2 flex h-4 min-w-4 items-center justify-center bg-neon px-1 font-mono text-[10px] font-black text-ink"
+              >
+                {totalItems > 99 ? "99+" : totalItems}
+              </span>
+            )}
           </button>
 
           <button

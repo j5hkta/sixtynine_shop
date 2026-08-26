@@ -6,7 +6,42 @@ import { ArrowLeft, PackageCheck, PackageX } from "lucide-react";
 import AccionesProducto from "@/components/tienda/AccionesProducto";
 import GaleriaProducto from "@/components/tienda/GaleriaProducto";
 import { moneda } from "@/lib/formato";
-import { createClient } from "@/lib/supabase/server";
+import { createAnonClient } from "@/lib/supabase/anon";
+
+/** ISR: ver el comentario en `src/app/(tienda)/page.tsx`. */
+export const revalidate = 60;
+
+/**
+ * Prerenderiza en el build una página por producto publicado.
+ *
+ * Un id que no esté en esta lista se genera bajo demanda y se cachea igual
+ * (`dynamicParams` es `true` por defecto), así que un producto creado después
+ * del build sigue funcionando.
+ *
+ * El try/catch es deliberado: sin `.env.local` configurado, o con Supabase
+ * caído, un fallo aquí tumbaría el `next build` entero. Devolver una lista
+ * vacía degrada a generación bajo demanda, que es exactamente el
+ * comportamiento anterior.
+ */
+export async function generateStaticParams() {
+  try {
+    const supabase = createAnonClient();
+    const { data, error } = await supabase
+      .from("productos")
+      .select("id")
+      .neq("estado", "borrador");
+
+    if (error) throw error;
+
+    return (data ?? []).map(({ id }) => ({ id }));
+  } catch (e) {
+    console.warn(
+      "[tienda] No se pudieron prerenderizar los productos; se generarán bajo demanda.",
+      e instanceof Error ? e.message : e,
+    );
+    return [];
+  }
+}
 
 /**
  * La politica RLS de lectura es abierta (la tienda no tiene sesion), asi que
@@ -14,19 +49,30 @@ import { createClient } from "@/lib/supabase/server";
  * de un producto sin publicar seria accesible para cualquiera que la adivine.
  */
 async function cargarProducto(id: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("productos")
-    .select("id, titulo, descripcion, precio, stock, categoria, tallas, imagenes, estado")
-    .eq("id", id)
-    .neq("estado", "borrador")
-    .maybeSingle();
+  try {
+    const supabase = createAnonClient();
+    const { data, error } = await supabase
+      .from("productos")
+      .select(
+        "id, titulo, descripcion, precio, stock, categoria, tallas, imagenes, estado",
+      )
+      .eq("id", id)
+      .neq("estado", "borrador")
+      .maybeSingle();
 
-  if (error) {
-    console.error("[tienda] Error al cargar el producto:", error);
+    if (error) throw error;
+
+    return data;
+  } catch (e) {
+    // Se degrada a 404 en lugar de romper el prerender (ver `cargarUltimos` en
+    // `src/app/(tienda)/page.tsx`). El log distingue un fallo real de un id
+    // que simplemente no existe.
+    console.error(
+      "[tienda] Error al cargar el producto:",
+      e instanceof Error ? e.message : e,
+    );
+    return null;
   }
-
-  return data;
 }
 
 export async function generateMetadata({
@@ -112,6 +158,8 @@ export default async function ProductoDetallePage({
             <AccionesProducto
               id={producto.id}
               titulo={producto.titulo}
+              precio={producto.precio}
+              imagen={imagenes[0] ?? null}
               tallas={tallas}
               stock={hayStock ? producto.stock : 0}
             />

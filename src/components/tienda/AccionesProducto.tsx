@@ -3,9 +3,14 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ShoppingBag } from "lucide-react";
 
+import { useCarrito } from "@/store/carrito";
+
 type AccionesProductoProps = {
   id: string;
   titulo: string;
+  precio: number;
+  /** Portada del producto; se guarda en la línea del carrito. */
+  imagen: string | null;
   tallas: string[];
   /** 0 deshabilita la compra. */
   stock: number;
@@ -14,9 +19,13 @@ type AccionesProductoProps = {
 export default function AccionesProducto({
   id,
   titulo,
+  precio,
+  imagen,
   tallas,
   stock,
 }: AccionesProductoProps) {
+  const agregarItem = useCarrito((estado) => estado.agregarItem);
+
   const [talla, setTalla] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [confirmado, setConfirmado] = useState(false);
@@ -40,8 +49,14 @@ export default function AccionesProducto({
 
     setAviso(null);
 
-    // TODO: aquí irá el estado real del carrito.
-    console.log("[carrito] añadir", { id, titulo, talla, cantidad: 1 });
+    agregarItem({
+      id_producto: id,
+      titulo,
+      precio,
+      talla,
+      imagen,
+      cantidad: 1,
+    });
 
     setConfirmado(true);
     if (temporizador.current) clearTimeout(temporizador.current);
