@@ -29,5 +29,24 @@ export default async function AdminLayout({
     redirect("/login?redirectTo=/admin");
   }
 
+  // Autorización: estar autenticado no basta, hace falta rol 'admin'.
+  // La política RLS "Cada usuario lee su propio perfil" limita esta consulta a
+  // la fila del propio usuario, así que no hace falta filtrar por seguridad,
+  // sólo por precisión. `maybeSingle()` devuelve null (sin error) si la cuenta
+  // todavía no tiene perfil.
+  const { data: perfil, error } = await supabase
+    .from("perfiles")
+    .select("rol")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (error) {
+    console.error("[admin] No se pudo leer el perfil del usuario:", error);
+  }
+
+  if (perfil?.rol !== "admin") {
+    redirect("/login?error=unauthorized");
+  }
+
   return <AdminShell>{children}</AdminShell>;
 }

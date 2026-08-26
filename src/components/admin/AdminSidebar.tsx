@@ -1,9 +1,11 @@
 "use client";
 
+import { useTransition } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ExternalLink, X } from "lucide-react";
+import { ExternalLink, Loader2, LogOut, X } from "lucide-react";
 
+import { logoutAction } from "@/actions/auth";
 import { adminNav, isNavItemActive } from "@/lib/admin-nav";
 
 type AdminSidebarProps = {
@@ -14,6 +16,7 @@ type AdminSidebarProps = {
 
 export default function AdminSidebar({ open, onClose }: AdminSidebarProps) {
   const pathname = usePathname();
+  const [loggingOut, startLogout] = useTransition();
 
   return (
     <aside
@@ -85,7 +88,7 @@ export default function AdminSidebar({ open, onClose }: AdminSidebarProps) {
       </nav>
 
       {/* Pie */}
-      <div className="shrink-0 border-t border-ink-line p-3">
+      <div className="shrink-0 space-y-1 border-t border-ink-line p-3">
         <Link
           href="/"
           className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold tracking-wide text-neutral-500 uppercase transition-colors hover:text-neon"
@@ -93,6 +96,25 @@ export default function AdminSidebar({ open, onClose }: AdminSidebarProps) {
           <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
           Ver tienda
         </Link>
+
+        <button
+          type="button"
+          disabled={loggingOut}
+          onClick={() => startLogout(logoutAction)}
+          className="flex w-full items-center gap-3 px-3 py-2.5 text-xs font-semibold tracking-wide text-neutral-500 uppercase transition-colors hover:bg-white/5 hover:text-neon disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loggingOut ? (
+            <>
+              <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden />
+              Saliendo...
+            </>
+          ) : (
+            <>
+              <LogOut className="h-4 w-4 shrink-0" aria-hidden />
+              Cerrar Sesión
+            </>
+          )}
+        </button>
       </div>
     </aside>
   );

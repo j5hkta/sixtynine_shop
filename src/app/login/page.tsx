@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { ShieldAlert } from "lucide-react";
 
+import { logoutAction } from "@/actions/auth";
 import LoginForm from "@/components/auth/LoginForm";
 
 export const metadata: Metadata = {
@@ -19,7 +21,9 @@ function safeRedirect(value: string | string[] | undefined): string {
 }
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  const redirectTo = safeRedirect((await searchParams).redirectTo);
+  const params = await searchParams;
+  const redirectTo = safeRedirect(params.redirectTo);
+  const sinPermisos = params.error === "unauthorized";
 
   return (
     <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-ink px-4 py-12">
@@ -52,6 +56,33 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           </p>
           <span className="mt-5 h-1 w-16 bg-neon" aria-hidden />
         </div>
+
+        {/* Sesión válida pero sin rol 'admin' */}
+        {sinPermisos && (
+          <div
+            role="alert"
+            className="mb-6 border border-neon/40 bg-neon/10 p-4 text-sm"
+          >
+            <p className="flex items-start gap-2 font-semibold text-neon">
+              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+              Tu cuenta no tiene permisos de administrador.
+            </p>
+            <p className="mt-2 pl-6 text-xs text-neutral-400">
+              Ingresa con una cuenta con rol <code>admin</code>, o pide que
+              promuevan la tuya.
+            </p>
+            {/* Sin esto la persona queda atrapada: sigue con sesión iniciada,
+                así que volver a enviar el formulario la devolvería aquí. */}
+            <form action={logoutAction} className="mt-3 pl-6">
+              <button
+                type="submit"
+                className="text-xs font-bold tracking-wide text-neutral-400 uppercase underline underline-offset-4 transition-colors hover:text-neon"
+              >
+                Cerrar la sesión actual
+              </button>
+            </form>
+          </div>
+        )}
 
         {/* Formulario */}
         <div className="border border-ink-line bg-ink-soft p-6 sm:p-8">
