@@ -16,6 +16,14 @@ export type EstadoProducto = "activo" | "borrador" | "agotado";
 /** Roles de `public.perfiles` (ver `supabase/roles_schema.sql`). */
 export type RolUsuario = "cliente" | "admin";
 
+/** Estados de `public.pedidos` (ver `supabase/pedidos_schema.sql`). */
+export type EstadoPedido =
+  | "pendiente"
+  | "confirmado"
+  | "enviado"
+  | "entregado"
+  | "cancelado";
+
 export type Database = {
   public: {
     Tables: {
@@ -86,6 +94,81 @@ export type Database = {
           },
         ];
       };
+      pedidos: {
+        Row: {
+          id: string;
+          creado_en: string;
+          cliente_nombre: string;
+          cliente_telefono: string;
+          cliente_dni: string;
+          direccion_envio: string;
+          total: number;
+          estado: EstadoPedido;
+        };
+        Insert: {
+          id?: string;
+          creado_en?: string;
+          cliente_nombre: string;
+          cliente_telefono: string;
+          cliente_dni: string;
+          direccion_envio: string;
+          total: number;
+          estado?: EstadoPedido;
+        };
+        Update: {
+          id?: string;
+          creado_en?: string;
+          cliente_nombre?: string;
+          cliente_telefono?: string;
+          cliente_dni?: string;
+          direccion_envio?: string;
+          total?: number;
+          estado?: EstadoPedido;
+        };
+        Relationships: [];
+      };
+      pedidos_items: {
+        Row: {
+          id: string;
+          pedido_id: string;
+          producto_id: string;
+          cantidad: number;
+          precio_unitario: number;
+          talla: string | null;
+        };
+        Insert: {
+          id?: string;
+          pedido_id: string;
+          producto_id: string;
+          cantidad: number;
+          precio_unitario: number;
+          talla?: string | null;
+        };
+        Update: {
+          id?: string;
+          pedido_id?: string;
+          producto_id?: string;
+          cantidad?: number;
+          precio_unitario?: number;
+          talla?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "pedidos_items_pedido_id_fkey";
+            columns: ["pedido_id"];
+            isOneToOne: false;
+            referencedRelation: "pedidos";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "pedidos_items_producto_id_fkey";
+            columns: ["producto_id"];
+            isOneToOne: false;
+            referencedRelation: "productos";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: { [_ in never]: never };
     Functions: { [_ in never]: never };
@@ -101,3 +184,7 @@ export type ProductoInsert =
 export type ProductoUpdate =
   Database["public"]["Tables"]["productos"]["Update"];
 export type Perfil = Database["public"]["Tables"]["perfiles"]["Row"];
+export type Pedido = Database["public"]["Tables"]["pedidos"]["Row"];
+export type PedidoInsert = Database["public"]["Tables"]["pedidos"]["Insert"];
+export type PedidoItemInsert =
+  Database["public"]["Tables"]["pedidos_items"]["Insert"];

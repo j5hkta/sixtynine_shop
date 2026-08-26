@@ -337,6 +337,16 @@ export async function eliminarProducto(id: string) {
 
   if (error) {
     console.error("[productos] Error al eliminar:", error);
+
+    // 23503 = violacion de clave foranea. `pedidos_items.producto_id` usa
+    // `on delete restrict` para no destruir el historial de pedidos.
+    if (error.code === "23503") {
+      throw new Error(
+        "No se puede eliminar: el producto aparece en pedidos ya registrados. " +
+          "Cámbialo a estado 'borrador' para retirarlo de la tienda.",
+      );
+    }
+
     throw new Error(`No se pudo eliminar el producto: ${error.message}`);
   }
 
