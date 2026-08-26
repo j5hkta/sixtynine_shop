@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, PackagePlus, Plus } from "lucide-react";
+import { AlertTriangle, PackagePlus, Pencil, Plus } from "lucide-react";
 
 import BotonEliminarProducto from "@/components/admin/BotonEliminarProducto";
 import { createClient } from "@/lib/supabase/server";
@@ -9,14 +9,16 @@ export const metadata = {
   title: "Productos",
 };
 
-// Si tu tienda no opera en pesos chilenos, cambia locale y currency aquí.
-const moneda = new Intl.NumberFormat("es-CL", {
+// Soles peruanos. `numeric(10,2)` en la BD y 2 decimales aquí: lo que se
+// muestra coincide exactamente con lo almacenado.
+const moneda = new Intl.NumberFormat("es-PE", {
   style: "currency",
-  currency: "CLP",
-  maximumFractionDigits: 0,
+  currency: "PEN",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
 });
 
-const fecha = new Intl.DateTimeFormat("es-CL", {
+const fecha = new Intl.DateTimeFormat("es-PE", {
   day: "2-digit",
   month: "short",
   year: "numeric",
@@ -116,9 +118,12 @@ export default async function ProductosPage() {
                   className="border-b border-ink-line/60 transition-colors last:border-b-0 hover:bg-white/[0.02]"
                 >
                   <td className="max-w-xs px-4 py-4">
-                    <p className="truncate font-bold text-white">
+                    <Link
+                      href={`/admin/productos/${producto.id}`}
+                      className="block truncate font-bold text-white transition-colors hover:text-neon"
+                    >
                       {producto.titulo}
-                    </p>
+                    </Link>
                     {producto.descripcion && (
                       <p className="mt-0.5 truncate text-xs text-neutral-500">
                         {producto.descripcion}
@@ -155,10 +160,21 @@ export default async function ProductosPage() {
                   </td>
 
                   <td className="px-4 py-4">
-                    <BotonEliminarProducto
-                      id={producto.id}
-                      titulo={producto.titulo}
-                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <Link
+                        href={`/admin/productos/${producto.id}`}
+                        aria-label={`Editar ${producto.titulo}`}
+                        title={`Editar ${producto.titulo}`}
+                        className="border border-ink-line p-2 text-neutral-500 transition-colors hover:border-neon/50 hover:bg-neon/10 hover:text-neon"
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden />
+                      </Link>
+
+                      <BotonEliminarProducto
+                        id={producto.id}
+                        titulo={producto.titulo}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}

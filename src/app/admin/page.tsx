@@ -26,7 +26,7 @@ type Kpi = {
 const kpis: Kpi[] = [
   {
     label: "Ventas de Hoy",
-    value: "$1.284.900",
+    value: "S/ 12,849.00",
     hint: "23 transacciones cerradas",
     delta: "+12,5%",
     positive: true,

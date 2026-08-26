@@ -89,7 +89,7 @@ export default function LoginForm({ redirectTo }: { redirectTo: string }) {
             autoComplete="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="admin@sixtynine.cl"
+            placeholder="admin@sixtynine.pe"
             className="w-full border border-ink-line bg-ink-soft py-3 pr-4 pl-10 text-sm text-white transition-colors placeholder:text-neutral-600 focus:border-neon focus:outline-none"
           />
         </div>

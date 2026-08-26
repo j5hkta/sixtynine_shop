@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
-import type { ProductoInsert } from "@/lib/supabase/types";
+import type { ProductoInsert, ProductoUpdate } from "@/lib/supabase/types";
 
 const LISTADO = "/admin/productos";
-const FORMULARIO = "/admin/productos/nuevo";
+const FORMULARIO_NUEVO = "/admin/productos/nuevo";
 
 /** Devuelve el texto de un campo del formulario, o "" si no vino. */
 function texto(formData: FormData, campo: string): string {
@@ -15,8 +15,78 @@ function texto(formData: FormData, campo: string): string {
   return typeof valor === "string" ? valor.trim() : "";
 }
 
+/**
+ * Convierte "S, M, L" en ["S", "M", "L"].
+ *
+ * El `filter(Boolean)` no es opcional: sin el, un campo vacio produce [""] y
+ * el producto quedaria con una talla fantasma en la base de datos. Tambien
+ * limpia las comas de mas ("S, , L") y la coma final.
+ */
+function listaDeTexto(valor: string): string[] {
+  return valor
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 function volverConError(destino: string, mensaje: string): never {
   redirect(`${destino}?error=${encodeURIComponent(mensaje)}`);
+}
+
+type CamposProducto = {
+  titulo: string;
+  descripcion: string | null;
+  categoria: string | null;
+  precio: number;
+  stock: number;
+  tallas: string[];
+  imagenes: string[];
+};
+
+/**
+ * Lee y valida los campos comunes al alta y la edicion.
+ * Ante un valor invalido no retorna: redirige a `destinoError`.
+ */
+function leerCampos(formData: FormData, destinoError: string): CamposProducto {
+  const titulo = texto(formData, "titulo");
+  const descripcion = texto(formData, "descripcion");
+  const categoria = texto(formData, "categoria");
+  const precio = Number(texto(formData, "precio"));
+  const stock = Number(texto(formData, "stock"));
+
+  if (!titulo) {
+    volverConError(destinoError, "El título es obligatorio.");
+  }
+  if (!Number.isFinite(precio) || precio < 0) {
+    volverConError(
+      destinoError,
+      "El precio debe ser un número mayor o igual a 0.",
+    );
+  }
+  if (!Number.isInteger(stock) || stock < 0) {
+    volverConError(
+      destinoError,
+      "El stock debe ser un número entero mayor o igual a 0.",
+    );
+  }
+
+  return {
+    titulo,
+    descripcion: descripcion || null,
+    categoria: categoria || null,
+    // La columna es numeric(10,2): se redondea aqui para que lo guardado
+    // coincida con lo que el listado muestra.
+    precio: Math.round(precio * 100) / 100,
+    stock,
+    tallas: listaDeTexto(texto(formData, "tallas")),
+    imagenes: listaDeTexto(texto(formData, "imagenes")),
+  };
+}
+
+function mensajeDeErrorSupabase(code: string, message: string, verbo: string) {
+  return code === "42501"
+    ? `No tienes permisos para ${verbo} productos.`
+    : `No se pudo ${verbo} el producto: ${message}`;
 }
 
 /**
@@ -27,45 +97,67 @@ function volverConError(destino: string, mensaje: string): never {
  * haya despues se ejecuta.
  */
 export async function crearProducto(formData: FormData) {
-  const titulo = texto(formData, "titulo");
-  const descripcion = texto(formData, "descripcion");
-  const categoria = texto(formData, "categoria");
-  const precio = Number(texto(formData, "precio"));
-  const stock = Number(texto(formData, "stock"));
+  const campos = leerCampos(formData, FORMULARIO_NUEVO);
 
-  if (!titulo) {
-    volverConError(FORMULARIO, "El título es obligatorio.");
-  }
-  if (!Number.isFinite(precio) || precio < 0) {
-    volverConError(FORMULARIO, "El precio debe ser un número mayor o igual a 0.");
-  }
-  if (!Number.isInteger(stock) || stock < 0) {
-    volverConError(FORMULARIO, "El stock debe ser un número entero mayor o igual a 0.");
-  }
-
-  const nuevo: ProductoInsert = {
-    titulo,
-    descripcion: descripcion || null,
-    categoria: categoria || null,
-    precio,
-    stock,
-  };
+  const nuevo: ProductoInsert = campos;
 
   const supabase = await createClient();
   const { error } = await supabase.from("productos").insert(nuevo);
 
   if (error) {
     console.error("[productos] Error al crear:", error);
-    // Con RLS activo, una cuenta sin rol 'admin' recibe exactamente este error.
     volverConError(
-      FORMULARIO,
-      error.code === "42501"
-        ? "No tienes permisos para crear productos."
-        : `No se pudo guardar el producto: ${error.message}`,
+      FORMULARIO_NUEVO,
+      mensajeDeErrorSupabase(error.code ?? "", error.message, "crear"),
     );
   }
 
   revalidatePath(LISTADO);
+  redirect(LISTADO);
+}
+
+/**
+ * Edicion de producto. El `id` viaja en un input oculto del formulario.
+ */
+export async function actualizarProducto(formData: FormData) {
+  const id = texto(formData, "id");
+
+  if (!id) {
+    volverConError(LISTADO, "Falta el identificador del producto a editar.");
+  }
+
+  const destinoError = `${LISTADO}/${id}`;
+  const cambios: ProductoUpdate = leerCampos(formData, destinoError);
+
+  const supabase = await createClient();
+
+  // Igual que en el borrado: un UPDATE bloqueado por la clausula `using` de
+  // RLS no lanza error, simplemente no encuentra la fila. El `.select()`
+  // devuelve lo realmente escrito, que es la unica forma de distinguir
+  // "actualizado" de "no tenias permiso".
+  const { data, error } = await supabase
+    .from("productos")
+    .update(cambios)
+    .eq("id", id)
+    .select("id");
+
+  if (error) {
+    console.error("[productos] Error al actualizar:", error);
+    volverConError(
+      destinoError,
+      mensajeDeErrorSupabase(error.code ?? "", error.message, "editar"),
+    );
+  }
+
+  if (!data || data.length === 0) {
+    volverConError(
+      destinoError,
+      "No se guardaron los cambios: el producto no existe o tu cuenta no tiene permisos.",
+    );
+  }
+
+  revalidatePath(LISTADO);
+  revalidatePath(destinoError);
   redirect(LISTADO);
 }
 
