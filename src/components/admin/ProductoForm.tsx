@@ -1,6 +1,8 @@
 import Link from "next/link";
+import { ImageUp } from "lucide-react";
 
 import BotonGuardar from "@/components/admin/BotonGuardar";
+import type { EstadoProducto } from "@/lib/supabase/types";
 
 export const CATEGORIAS = [
   "Tablas",
@@ -14,6 +16,12 @@ export const CATEGORIAS = [
   "Accesorios",
 ];
 
+const ESTADOS: { valor: EstadoProducto; etiqueta: string; ayuda: string }[] = [
+  { valor: "activo", etiqueta: "Activo", ayuda: "visible en la tienda" },
+  { valor: "borrador", etiqueta: "Borrador", ayuda: "oculto, en preparación" },
+  { valor: "agotado", etiqueta: "Agotado", ayuda: "visible pero sin venta" },
+];
+
 const inputClase =
   "w-full border border-ink-line bg-ink-soft px-4 py-3 text-sm text-white transition-colors placeholder:text-neutral-600 focus:border-neon focus:outline-none";
 
@@ -22,7 +30,7 @@ const labelClase =
 
 const ayudaClase = "text-xs text-neutral-600";
 
-/** Valores iniciales del formulario, ya normalizados a string por la página. */
+/** Valores iniciales del formulario, ya normalizados por la página. */
 export type ValoresProducto = {
   titulo: string;
   descripcion: string;
@@ -31,8 +39,9 @@ export type ValoresProducto = {
   categoria: string;
   /** Separadas por coma, ej. "S, M, L". */
   tallas: string;
-  /** Separadas por coma, ej. "url1.jpg, url2.jpg". */
-  imagenes: string;
+  /** URLs públicas ya guardadas en el producto. */
+  imagenes: string[];
+  estado: EstadoProducto;
 };
 
 const VACIO: ValoresProducto = {
@@ -42,7 +51,8 @@ const VACIO: ValoresProducto = {
   stock: 0,
   categoria: "",
   tallas: "",
-  imagenes: "",
+  imagenes: [],
+  estado: "activo",
 };
 
 type ProductoFormProps = {
@@ -76,6 +86,7 @@ export default function ProductoForm({
   return (
     <form
       action={action}
+      encType="multipart/form-data"
       className="space-y-6 border border-ink-line bg-ink-soft p-6 sm:p-8"
     >
       {productoId && <input type="hidden" name="id" value={productoId} />}
@@ -144,23 +155,43 @@ export default function ProductoForm({
         </div>
       </div>
 
-      <div className="space-y-2">
-        <label htmlFor="categoria" className={labelClase}>
-          Categoría
-        </label>
-        <select
-          id="categoria"
-          name="categoria"
-          defaultValue={valores.categoria}
-          className={inputClase}
-        >
-          <option value="">Sin categoría</option>
-          {categorias.map((categoria) => (
-            <option key={categoria} value={categoria}>
-              {categoria}
-            </option>
-          ))}
-        </select>
+      <div className="grid gap-6 sm:grid-cols-2">
+        <div className="space-y-2">
+          <label htmlFor="categoria" className={labelClase}>
+            Categoría
+          </label>
+          <select
+            id="categoria"
+            name="categoria"
+            defaultValue={valores.categoria}
+            className={inputClase}
+          >
+            <option value="">Sin categoría</option>
+            {categorias.map((categoria) => (
+              <option key={categoria} value={categoria}>
+                {categoria}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="estado" className={labelClase}>
+            Estado
+          </label>
+          <select
+            id="estado"
+            name="estado"
+            defaultValue={valores.estado}
+            className={inputClase}
+          >
+            {ESTADOS.map(({ valor, etiqueta, ayuda }) => (
+              <option key={valor} value={valor}>
+                {etiqueta} — {ayuda}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="space-y-2">
@@ -182,32 +213,79 @@ export default function ProductoForm({
         </p>
       </div>
 
+      {/* Galería ya guardada: sólo aparece al editar. */}
+      {valores.imagenes.length > 0 && (
+        <fieldset className="space-y-3">
+          <legend className={labelClase}>Imágenes actuales</legend>
+
+          <ul className="space-y-2">
+            {valores.imagenes.map((url) => (
+              <li key={url}>
+                <label className="flex items-center gap-3 border border-ink-line bg-ink p-2 transition-colors hover:border-neon/40">
+                  <input
+                    type="checkbox"
+                    name="imagenes_actuales"
+                    value={url}
+                    defaultChecked
+                    className="h-4 w-4 shrink-0 accent-[#ffe600]"
+                  />
+                  {/* Miniaturas de un bucket cuyo host depende de la variable
+                      de entorno; `next/image` exigiria declararlo en
+                      `images.remotePatterns` en tiempo de build. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={url}
+                    alt=""
+                    className="h-12 w-12 shrink-0 border border-ink-line object-cover"
+                  />
+                  <span className="truncate font-mono text-xs text-neutral-500">
+                    {url.split("/").pop()}
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+
+          <p className={ayudaClase}>
+            Desmarca una imagen para quitarla del producto al guardar. El
+            archivo permanece en el bucket.
+          </p>
+        </fieldset>
+      )}
+
       <div className="space-y-2">
-        <label htmlFor="imagenes" className={labelClase}>
-          URLs de Imágenes
+        <label htmlFor="imagenes_upload" className={labelClase}>
+          {valores.imagenes.length > 0 ? "Añadir imágenes" : "Imágenes"}
         </label>
+
+        <label
+          htmlFor="imagenes_upload"
+          className="flex cursor-pointer items-center gap-3 border border-dashed border-ink-line bg-ink px-4 py-5 transition-colors hover:border-neon/50 hover:bg-neon/5"
+        >
+          <ImageUp className="h-5 w-5 shrink-0 text-neutral-500" aria-hidden />
+          <span className="text-sm text-neutral-500">
+            Selecciona uno o varios archivos
+          </span>
+        </label>
+
         <input
-          id="imagenes"
-          name="imagenes"
-          type="text"
-          defaultValue={valores.imagenes}
-          placeholder="url1.jpg, url2.jpg"
+          id="imagenes_upload"
+          name="imagenes_upload"
+          type="file"
+          multiple
+          accept="image/*"
           aria-describedby="imagenes-ayuda"
-          className={inputClase}
+          className="block w-full text-xs text-neutral-500 file:mr-4 file:border-0 file:bg-neon file:px-4 file:py-2 file:text-xs file:font-black file:tracking-widest file:text-ink file:uppercase hover:file:bg-white"
         />
+
         <p id="imagenes-ayuda" className={ayudaClase}>
-          Separa las URLs por comas. Ej:{" "}
-          <code>https://.../tabla-1.jpg, https://.../tabla-2.jpg</code>. La
-          primera se usa como portada.
+          JPG, PNG, WEBP, AVIF o GIF. Máximo 5 MB por archivo y ~12 MB por
+          envío. Se suben al bucket <code>productos</code> al guardar; la
+          primera imagen se usa como portada.
         </p>
       </div>
 
-      <p className="border-t border-ink-line pt-5 text-xs text-neutral-600">
-        El estado del producto (<code>activo</code>, <code>borrador</code>,{" "}
-        <code>agotado</code>) se gestiona aparte y no se modifica desde aquí.
-      </p>
-
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3 border-t border-ink-line pt-6">
         <BotonGuardar>{etiquetaBoton}</BotonGuardar>
 
         <Link

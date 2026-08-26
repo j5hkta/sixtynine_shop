@@ -21,7 +21,7 @@ export default async function EditarProductoPage({
   const { data: producto, error } = await supabase
     .from("productos")
     .select(
-      "id, titulo, descripcion, precio, stock, categoria, tallas, imagenes",
+      "id, titulo, descripcion, precio, stock, categoria, tallas, imagenes, estado",
     )
     .eq("id", id)
     .maybeSingle();
@@ -75,10 +75,13 @@ export default async function EditarProductoPage({
           precio: producto.precio,
           stock: producto.stock,
           categoria: producto.categoria ?? "",
-          // La BD devuelve text[]; el formulario trabaja con texto separado
-          // por comas, igual que lo que `listaDeTexto` sabe volver a parsear.
+          // La BD devuelve text[]; el campo de tallas trabaja con texto
+          // separado por comas, que es lo que `listaDeTexto` sabe reparsear.
           tallas: (producto.tallas ?? []).join(", "),
-          imagenes: (producto.imagenes ?? []).join(", "),
+          // Las imágenes ya no son un campo de texto: el formulario las
+          // muestra como casillas para conservar o quitar.
+          imagenes: producto.imagenes ?? [],
+          estado: producto.estado,
         }}
       />
     </div>
