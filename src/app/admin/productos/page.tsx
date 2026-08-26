@@ -2,27 +2,13 @@ import Link from "next/link";
 import { AlertTriangle, PackagePlus, Pencil, Plus } from "lucide-react";
 
 import BotonEliminarProducto from "@/components/admin/BotonEliminarProducto";
+import { fecha, moneda } from "@/lib/formato";
 import { createClient } from "@/lib/supabase/server";
 import type { EstadoProducto } from "@/lib/supabase/types";
 
 export const metadata = {
   title: "Productos",
 };
-
-// Soles peruanos. `numeric(10,2)` en la BD y 2 decimales aquí: lo que se
-// muestra coincide exactamente con lo almacenado.
-const moneda = new Intl.NumberFormat("es-PE", {
-  style: "currency",
-  currency: "PEN",
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
-
-const fecha = new Intl.DateTimeFormat("es-PE", {
-  day: "2-digit",
-  month: "short",
-  year: "numeric",
-});
 
 const estiloEstado: Record<EstadoProducto, string> = {
   activo: "border-neon/40 bg-neon/10 text-neon",
