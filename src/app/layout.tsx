@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import NextTopLoader from "nextjs-toploader";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -28,21 +27,11 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="es"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">
-        {/* Barra de progreso en cada navegación del router. Va en el layout
-            raíz para cubrir tienda, panel y login con una sola instancia.
-            Trae su propio "use client", así que este layout sigue siendo
-            Server Component. */}
-        <NextTopLoader
-          color="#FFE600"
-          height={3}
-          showSpinner={false}
-          shadow="0 0 12px #FFE600, 0 0 5px #FFE600"
-          easing="ease"
-          speed={250}
-        />
-        {children}
-      </body>
+      {/* La barra de progreso ya no vive aquí: cada zona monta la suya con su
+          propio color (negra en la tienda, neón en el panel), porque una única
+          instancia global obligaría a elegir un color que se pierde sobre uno
+          de los dos fondos. */}
+      <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );
 }

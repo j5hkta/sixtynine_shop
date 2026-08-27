@@ -1,4 +1,5 @@
 import {
+  Image,
   LayoutDashboard,
   Package,
   ShoppingBag,
@@ -18,6 +19,7 @@ export const adminNav: AdminNavItem[] = [
   { href: "/admin/productos", label: "Productos", icon: Package },
   { href: "/admin/pedidos", label: "Pedidos", icon: ShoppingBag },
   { href: "/admin/clientes", label: "Clientes", icon: Users },
+  { href: "/admin/apariencia", label: "Apariencia", icon: Image },
 ];
 
 /**

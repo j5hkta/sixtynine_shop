@@ -85,8 +85,8 @@ export default function AccionesProducto({
                   aria-pressed={seleccionada}
                   className={`min-w-14 border px-4 py-3 font-mono text-sm font-bold transition-colors ${
                     seleccionada
-                      ? "border-neon bg-neon text-ink"
-                      : "border-ink-line text-neutral-300 hover:border-neon/50 hover:text-neon"
+                      ? "border-black bg-black text-white"
+                      : "border-neutral-200 text-neutral-700 hover:border-black hover:text-black"
                   }`}
                 >
                   {opcion}
@@ -98,7 +98,7 @@ export default function AccionesProducto({
       )}
 
       {aviso && (
-        <p role="alert" className="text-sm text-red-400">
+        <p role="alert" className="text-sm text-red-600">
           {aviso}
         </p>
       )}
@@ -107,7 +107,7 @@ export default function AccionesProducto({
         type="button"
         onClick={anadirAlCarrito}
         disabled={sinStock}
-        className="flex w-full items-center justify-center gap-2 bg-neon py-4 text-sm font-black tracking-[0.15em] text-ink uppercase transition-colors hover:bg-white disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-400"
+        className="flex w-full items-center justify-center gap-2 bg-black py-4 text-sm font-black tracking-[0.15em] text-white uppercase transition-colors hover:opacity-80 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-400"
       >
         {sinStock ? (
           "Sin stock"

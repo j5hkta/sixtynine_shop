@@ -1,11 +1,20 @@
 @import "tailwindcss";
 
+/*
+ * Dos paletas conviven a propósito:
+ *
+ *  - La tienda pública es blanco y negro estricto (estilo outlet). Usa
+ *    utilidades planas de Tailwind: bg-white, text-black, border-neutral-200.
+ *  - El panel /admin sigue siendo oscuro con acento neón, y para eso están los
+ *    tokens `ink*` y `neon` de abajo. No los borres: los usan el Sidebar, el
+ *    Header, las tablas y todos los formularios del panel.
+ */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --foreground: #000000;
 }
 
-/* Paleta de marca - Sixty Nine Skate & Apparel Store */
+/* Paleta del panel administrativo - Sixty Nine Skate & Apparel Store */
 @theme {
   --color-ink: #0d0d0d;
   --color-ink-soft: #141414;
@@ -20,12 +29,14 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
+/*
+ * Sin bloque `prefers-color-scheme: dark`.
+ *
+ * Antes invertía el `body` a negro para quien tuviera el sistema en modo
+ * oscuro. Con la tienda en blanco eso dejaba franjas negras asomando por
+ * cualquier hueco que el contenido no cubriera. El fondo es blanco siempre;
+ * las secciones oscuras (panel, pie) se pintan ellas mismas.
+ */
 
 body {
   background: var(--background);

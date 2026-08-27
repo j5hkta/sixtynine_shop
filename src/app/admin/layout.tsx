@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
+import NextTopLoader from "nextjs-toploader";
 
 import AdminShell from "@/components/admin/AdminShell";
 import { createClient } from "@/lib/supabase/server";
@@ -48,5 +49,18 @@ export default async function AdminLayout({
     redirect("/login?error=unauthorized");
   }
 
-  return <AdminShell>{children}</AdminShell>;
+  return (
+    <>
+      {/* El panel conserva el neón; en la tienda la barra es negra. */}
+      <NextTopLoader
+        color="#FFE600"
+        height={3}
+        showSpinner={false}
+        shadow="0 0 12px #FFE600, 0 0 5px #FFE600"
+        easing="ease"
+        speed={250}
+      />
+      <AdminShell>{children}</AdminShell>
+    </>
+  );
 }

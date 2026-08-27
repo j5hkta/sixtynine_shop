@@ -38,13 +38,13 @@ export default function CarritoPage() {
   if (!hidratado) {
     return (
       <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
-        <div className="h-10 w-56 animate-pulse bg-white/5" />
+        <div className="h-10 w-56 animate-pulse bg-neutral-100" />
         <div className="mt-10 grid gap-8 lg:grid-cols-[1fr_20rem]">
           <div className="space-y-3">
-            <div className="h-28 animate-pulse bg-white/5" />
-            <div className="h-28 animate-pulse bg-white/5" />
+            <div className="h-28 animate-pulse bg-neutral-100" />
+            <div className="h-28 animate-pulse bg-neutral-100" />
           </div>
-          <div className="h-64 animate-pulse bg-white/5" />
+          <div className="h-64 animate-pulse bg-neutral-100" />
         </div>
       </div>
     );
@@ -61,10 +61,10 @@ export default function CarritoPage() {
           <p className="text-[11px] font-bold tracking-[0.3em] text-neutral-500 uppercase">
             Tu selección
           </p>
-          <h1 className="mt-2 text-4xl font-black tracking-tighter text-white uppercase sm:text-5xl">
+          <h1 className="mt-2 text-4xl font-black tracking-tighter text-black uppercase sm:text-5xl">
             Carrito
           </h1>
-          <span className="mt-4 block h-1 w-16 bg-neon" aria-hidden />
+          <span className="mt-4 block h-1 w-16 bg-black" aria-hidden />
           <p className="mt-4 text-sm text-neutral-500">
             {totalItems} {totalItems === 1 ? "artículo" : "artículos"} en{" "}
             {items.length} {items.length === 1 ? "línea" : "líneas"}.
@@ -74,7 +74,7 @@ export default function CarritoPage() {
         <button
           type="button"
           onClick={limpiarCarrito}
-          className="text-[11px] font-bold tracking-[0.2em] text-neutral-600 uppercase transition-colors hover:text-red-400"
+          className="text-[11px] font-bold tracking-[0.2em] text-neutral-400 uppercase transition-colors hover:text-red-600"
         >
           Vaciar carrito
         </button>
@@ -94,40 +94,40 @@ export default function CarritoPage() {
         </ul>
 
         {/* Columna derecha: resumen */}
-        <aside className="border border-ink-line bg-ink-soft p-6 lg:sticky lg:top-24">
+        <aside className="border border-neutral-200 bg-white p-6 lg:sticky lg:top-24">
           <h2 className="text-[11px] font-bold tracking-[0.25em] text-neutral-500 uppercase">
             Resumen de orden
           </h2>
 
-          <dl className="mt-6 space-y-3 border-b border-ink-line pb-6 text-sm">
+          <dl className="mt-6 space-y-3 border-b border-neutral-200 pb-6 text-sm">
             <div className="flex items-baseline justify-between gap-4">
-              <dt className="text-neutral-400">Subtotal</dt>
-              <dd className="font-mono font-bold text-white">
+              <dt className="text-neutral-600">Subtotal</dt>
+              <dd className="font-mono font-bold text-black">
                 {moneda.format(subtotal)}
               </dd>
             </div>
             <div className="flex items-baseline justify-between gap-4">
-              <dt className="text-neutral-400">Envío</dt>
-              <dd className="text-xs text-neutral-600">Por calcular</dd>
+              <dt className="text-neutral-600">Envío</dt>
+              <dd className="text-xs text-neutral-400">Por calcular</dd>
             </div>
           </dl>
 
           <div className="mt-6 flex items-baseline justify-between gap-4">
-            <span className="text-[11px] font-bold tracking-[0.2em] text-neutral-400 uppercase">
+            <span className="text-[11px] font-bold tracking-[0.2em] text-neutral-600 uppercase">
               Total
             </span>
-            <span className="font-mono text-2xl font-black text-neon">
+            <span className="font-mono text-2xl font-black text-black">
               {moneda.format(subtotal)}
             </span>
           </div>
 
-          <p className="mt-3 text-xs leading-relaxed text-neutral-600">
+          <p className="mt-3 text-xs leading-relaxed text-neutral-400">
             El envío se calculará en el siguiente paso.
           </p>
 
           <Link
             href="/checkout"
-            className="mt-6 flex w-full items-center justify-center gap-2 bg-neon py-4 text-xs font-black tracking-[0.15em] text-ink uppercase transition-colors hover:bg-white"
+            className="mt-6 flex w-full items-center justify-center gap-2 bg-black py-4 text-xs font-black tracking-[0.15em] text-white uppercase transition-colors hover:opacity-80"
           >
             Proceder al Pago
             <ArrowRight className="h-4 w-4" aria-hidden />
@@ -135,7 +135,7 @@ export default function CarritoPage() {
 
           <Link
             href="/productos"
-            className="mt-3 block text-center text-[11px] font-bold tracking-[0.2em] text-neutral-500 uppercase transition-colors hover:text-neon"
+            className="mt-3 block text-center text-[11px] font-bold tracking-[0.2em] text-neutral-500 uppercase transition-colors hover:text-black"
           >
             Seguir comprando
           </Link>
@@ -148,14 +148,14 @@ export default function CarritoPage() {
 function CarritoVacio() {
   return (
     <div className="mx-auto flex max-w-6xl flex-col items-center px-4 py-28 text-center sm:px-6">
-      <span className="flex h-20 w-20 items-center justify-center border border-ink-line bg-ink-soft text-neutral-600">
+      <span className="flex h-20 w-20 items-center justify-center border border-neutral-200 bg-white text-neutral-400">
         <ShoppingBag className="h-8 w-8" aria-hidden />
       </span>
 
-      <h1 className="mt-8 text-3xl font-black tracking-tighter text-white uppercase sm:text-4xl">
+      <h1 className="mt-8 text-3xl font-black tracking-tighter text-black uppercase sm:text-4xl">
         Tu carrito está vacío
       </h1>
-      <span className="mt-4 block h-1 w-16 bg-neon" aria-hidden />
+      <span className="mt-4 block h-1 w-16 bg-black" aria-hidden />
 
       <p className="mt-6 max-w-sm text-sm leading-relaxed text-neutral-500">
         Todavía no has añadido nada. Date una vuelta por el catálogo y arma tu
@@ -164,7 +164,7 @@ function CarritoVacio() {
 
       <Link
         href="/productos"
-        className="mt-10 flex items-center gap-2 bg-neon px-8 py-4 text-xs font-black tracking-[0.2em] text-ink uppercase transition-colors hover:bg-white"
+        className="mt-10 flex items-center gap-2 bg-black px-8 py-4 text-xs font-black tracking-[0.2em] text-white uppercase transition-colors hover:opacity-80"
       >
         Ir al Catálogo
         <ArrowRight className="h-4 w-4" aria-hidden />
@@ -186,11 +186,11 @@ function LineaCarrito({
   const enMaximo = item.cantidad >= CANTIDAD_MAXIMA;
 
   return (
-    <li className="flex gap-4 border border-ink-line bg-ink-soft p-4 transition-colors hover:border-neon/30">
+    <li className="flex gap-4 border border-neutral-200 bg-white p-4 transition-colors hover:border-black">
       {/* Miniatura */}
       <Link
         href={`/productos/${item.id_producto}`}
-        className="h-24 w-24 shrink-0 overflow-hidden border border-ink-line bg-ink"
+        className="h-24 w-24 shrink-0 overflow-hidden border border-neutral-200 bg-white"
         aria-hidden
         tabIndex={-1}
       >
@@ -203,7 +203,7 @@ function LineaCarrito({
             className="h-full w-full object-cover"
           />
         ) : (
-          <span className="flex h-full w-full items-center justify-center bg-neutral-800/40 text-neutral-600">
+          <span className="flex h-full w-full items-center justify-center bg-neutral-100 text-neutral-400">
             <ImageOff className="h-6 w-6" aria-hidden />
           </span>
         )}
@@ -213,7 +213,7 @@ function LineaCarrito({
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <Link
           href={`/productos/${item.id_producto}`}
-          className="truncate text-sm font-bold text-white transition-colors hover:text-neon"
+          className="truncate text-sm font-bold text-black transition-colors hover:text-black"
         >
           {item.titulo}
         </Link>
@@ -221,7 +221,7 @@ function LineaCarrito({
         {item.talla && (
           <p className="text-[11px] font-bold tracking-[0.15em] text-neutral-500 uppercase">
             Talla{" "}
-            <span className="font-mono text-neutral-300">{item.talla}</span>
+            <span className="font-mono text-neutral-700">{item.talla}</span>
           </p>
         )}
 
@@ -231,20 +231,20 @@ function LineaCarrito({
 
         {/* Cantidad */}
         <div className="mt-auto flex items-center gap-3 pt-3">
-          <div className="flex items-center border border-ink-line">
+          <div className="flex items-center border border-neutral-200">
             <button
               type="button"
               onClick={() => onCantidad(item.id, item.cantidad - 1)}
               disabled={enMinimo}
               aria-label={`Quitar una unidad de ${item.titulo}`}
-              className="p-2 text-neutral-400 transition-colors hover:bg-white/5 hover:text-neon disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-400"
+              className="p-2 text-neutral-600 transition-colors hover:bg-neutral-50 hover:text-black disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-600"
             >
               <Minus className="h-3.5 w-3.5" aria-hidden />
             </button>
 
             <span
               aria-live="polite"
-              className="min-w-10 px-1 text-center font-mono text-sm font-bold text-white"
+              className="min-w-10 px-1 text-center font-mono text-sm font-bold text-black"
             >
               {item.cantidad}
             </span>
@@ -254,7 +254,7 @@ function LineaCarrito({
               onClick={() => onCantidad(item.id, item.cantidad + 1)}
               disabled={enMaximo}
               aria-label={`Añadir una unidad de ${item.titulo}`}
-              className="p-2 text-neutral-400 transition-colors hover:bg-white/5 hover:text-neon disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-400"
+              className="p-2 text-neutral-600 transition-colors hover:bg-neutral-50 hover:text-black disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-neutral-600"
             >
               <Plus className="h-3.5 w-3.5" aria-hidden />
             </button>
@@ -265,7 +265,7 @@ function LineaCarrito({
             onClick={() => onRemover(item.id)}
             aria-label={`Quitar ${item.titulo} del carrito`}
             title="Quitar del carrito"
-            className="border border-ink-line p-2 text-neutral-500 transition-colors hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-400"
+            className="border border-neutral-200 p-2 text-neutral-500 transition-colors hover:border-red-500/50 hover:bg-red-500/10 hover:text-red-600"
           >
             <Trash2 className="h-3.5 w-3.5" aria-hidden />
           </button>
@@ -273,7 +273,7 @@ function LineaCarrito({
       </div>
 
       {/* Total de la línea */}
-      <p className="shrink-0 self-start font-mono text-base font-black whitespace-nowrap text-white">
+      <p className="shrink-0 self-start font-mono text-base font-black whitespace-nowrap text-black">
         {moneda.format(item.precio * item.cantidad)}
       </p>
     </li>

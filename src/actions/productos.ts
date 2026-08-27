@@ -1,10 +1,9 @@
 "use server";
 
-import { createHash } from "node:crypto";
-
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { archivosDeFormData, subirImagenes } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/server";
 import type {
   EstadoProducto,
@@ -14,18 +13,6 @@ import type {
 
 const LISTADO = "/admin/productos";
 const FORMULARIO_NUEVO = "/admin/productos/nuevo";
-
-const BUCKET = "productos";
-const MAX_BYTES_IMAGEN = 5 * 1024 * 1024; // Igual que el limite del bucket.
-
-/** Extension por MIME. Sirve tambien de lista blanca de formatos aceptados. */
-const EXTENSION_POR_MIME: Record<string, string> = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-  "image/avif": "avif",
-  "image/gif": "gif",
-};
 
 const ESTADOS_VALIDOS: readonly EstadoProducto[] = [
   "activo",
@@ -55,90 +42,6 @@ function listaDeTexto(valor: string): string[] {
 
 function volverConError(destino: string, mensaje: string): never {
   redirect(`${destino}?error=${encodeURIComponent(mensaje)}`);
-}
-
-// -----------------------------------------------------------------------------
-// Subida de imagenes a Supabase Storage
-// -----------------------------------------------------------------------------
-
-type ResultadoSubida = {
-  urls: string[];
-  errores: string[];
-};
-
-type ClienteSupabase = Awaited<ReturnType<typeof createClient>>;
-
-/**
- * Sube a Storage cada archivo de `imagenes_upload` como un objeto independiente
- * y devuelve sus URLs publicas.
- *
- * Deduplicacion: se calcula el SHA-256 del contenido y se usa como nombre del
- * objeto. Eso descarta los duplicados de la misma peticion aunque lleguen con
- * nombres de archivo distintos (comparar por `name` no lo detectaria), y hace
- * la operacion idempotente entre peticiones: volver a subir la misma imagen
- * apunta al mismo objeto en vez de crear una copia huerfana.
- */
-async function subirImagenes(
-  supabase: ClienteSupabase,
-  formData: FormData,
-): Promise<ResultadoSubida> {
-  const archivos = formData
-    .getAll("imagenes_upload")
-    // Un `<input type="file">` sin seleccion envia un File vacio, no nada.
-    .filter((valor): valor is File => valor instanceof File && valor.size > 0);
-
-  const urls: string[] = [];
-  const errores: string[] = [];
-  const hashesVistos = new Set<string>();
-
-  for (const archivo of archivos) {
-    const extension = EXTENSION_POR_MIME[archivo.type];
-
-    if (!extension) {
-      errores.push(
-        `"${archivo.name}": formato no admitido (${archivo.type || "desconocido"}).`,
-      );
-      continue;
-    }
-
-    if (archivo.size > MAX_BYTES_IMAGEN) {
-      errores.push(
-        `"${archivo.name}": pesa ${(archivo.size / 1024 / 1024).toFixed(1)} MB y el maximo es 5 MB.`,
-      );
-      continue;
-    }
-
-    const bytes = new Uint8Array(await archivo.arrayBuffer());
-    const hash = createHash("sha256").update(bytes).digest("hex");
-
-    if (hashesVistos.has(hash)) {
-      // Duplicado exacto dentro de esta misma peticion: se ignora en silencio.
-      continue;
-    }
-    hashesVistos.add(hash);
-
-    const ruta = `${hash}.${extension}`;
-
-    // Una llamada por archivo: cada imagen es un objeto separado en el bucket.
-    const { error } = await supabase.storage.from(BUCKET).upload(ruta, bytes, {
-      contentType: archivo.type,
-      cacheControl: "31536000",
-      // El nombre es el hash del contenido, asi que sobrescribir es escribir
-      // exactamente los mismos bytes.
-      upsert: true,
-    });
-
-    if (error) {
-      console.error("[productos] Error al subir imagen:", archivo.name, error);
-      errores.push(`"${archivo.name}": ${error.message}`);
-      continue;
-    }
-
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(ruta);
-    urls.push(data.publicUrl);
-  }
-
-  return { urls, errores };
 }
 
 // -----------------------------------------------------------------------------
@@ -223,7 +126,10 @@ export async function crearProducto(formData: FormData) {
   const campos = leerCampos(formData, FORMULARIO_NUEVO);
 
   const supabase = await createClient();
-  const { urls, errores } = await subirImagenes(supabase, formData);
+  const { urls, errores } = await subirImagenes(
+    supabase,
+    archivosDeFormData(formData, "imagenes_upload"),
+  );
 
   // Si alguna imagen falla no se guarda nada: es preferible a crear el producto
   // con la galeria incompleta y que nadie se entere.
@@ -267,7 +173,10 @@ export async function actualizarProducto(formData: FormData) {
   const campos = leerCampos(formData, destinoError);
 
   const supabase = await createClient();
-  const { urls, errores } = await subirImagenes(supabase, formData);
+  const { urls, errores } = await subirImagenes(
+    supabase,
+    archivosDeFormData(formData, "imagenes_upload"),
+  );
 
   if (errores.length > 0) {
     volverConError(

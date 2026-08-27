@@ -178,6 +178,24 @@ export type Database = {
           },
         ];
       };
+      configuracion_tienda: {
+        Row: {
+          id: number;
+          banner_imagen: string | null;
+          banner_link: string | null;
+        };
+        Insert: {
+          id: number;
+          banner_imagen?: string | null;
+          banner_link?: string | null;
+        };
+        Update: {
+          id?: number;
+          banner_imagen?: string | null;
+          banner_link?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -209,3 +227,5 @@ export type Pedido = Database["public"]["Tables"]["pedidos"]["Row"];
 export type PedidoInsert = Database["public"]["Tables"]["pedidos"]["Insert"];
 export type PedidoItemInsert =
   Database["public"]["Tables"]["pedidos_items"]["Insert"];
+export type ConfiguracionTienda =
+  Database["public"]["Tables"]["configuracion_tienda"]["Row"];

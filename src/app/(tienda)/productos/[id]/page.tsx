@@ -107,7 +107,7 @@ export default async function ProductoDetallePage({
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
       <Link
         href="/productos"
-        className="inline-flex items-center gap-2 text-[11px] font-bold tracking-[0.2em] text-neutral-500 uppercase transition-colors hover:text-neon"
+        className="inline-flex items-center gap-2 text-[11px] font-bold tracking-[0.2em] text-neutral-500 uppercase transition-colors hover:text-black"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden />
         Volver al catálogo
@@ -123,38 +123,38 @@ export default async function ProductoDetallePage({
             </p>
           )}
 
-          <h1 className="mt-3 text-3xl leading-tight font-black tracking-tighter text-white uppercase sm:text-4xl">
+          <h1 className="mt-3 text-3xl leading-tight font-black tracking-tighter text-black uppercase sm:text-4xl">
             {producto.titulo}
           </h1>
 
-          <p className="mt-6 font-mono text-4xl font-black text-neon">
+          <p className="mt-6 font-mono text-4xl font-black text-black">
             {moneda.format(producto.precio)}
           </p>
 
           <p className="mt-4 flex items-center gap-2 text-xs font-bold tracking-wide uppercase">
             {hayStock ? (
               <>
-                <PackageCheck className="h-4 w-4 text-neon" aria-hidden />
-                <span className="text-neutral-400">
+                <PackageCheck className="h-4 w-4 text-black" aria-hidden />
+                <span className="text-neutral-600">
                   En stock — {producto.stock}{" "}
                   {producto.stock === 1 ? "unidad" : "unidades"}
                 </span>
               </>
             ) : (
               <>
-                <PackageX className="h-4 w-4 text-red-400" aria-hidden />
-                <span className="text-red-400">Agotado</span>
+                <PackageX className="h-4 w-4 text-red-600" aria-hidden />
+                <span className="text-red-600">Agotado</span>
               </>
             )}
           </p>
 
           {producto.descripcion && (
-            <p className="mt-8 border-t border-ink-line pt-8 text-sm leading-relaxed text-neutral-400">
+            <p className="mt-8 border-t border-neutral-200 pt-8 text-sm leading-relaxed text-neutral-600">
               {producto.descripcion}
             </p>
           )}
 
-          <div className="mt-8 border-t border-ink-line pt-8">
+          <div className="mt-8 border-t border-neutral-200 pt-8">
             <AccionesProducto
               id={producto.id}
               titulo={producto.titulo}

@@ -14,7 +14,7 @@ export default function GaleriaProducto({
 
   if (imagenes.length === 0) {
     return (
-      <div className="flex aspect-square w-full flex-col items-center justify-center gap-3 border border-ink-line bg-neutral-800/40 text-neutral-600">
+      <div className="flex aspect-square w-full flex-col items-center justify-center gap-3 border border-neutral-200 bg-neutral-100 text-neutral-400">
         <ImageOff className="h-10 w-10" aria-hidden />
         <span className="text-[10px] font-bold tracking-widest uppercase">
           Sin imagen
@@ -25,7 +25,7 @@ export default function GaleriaProducto({
 
   return (
     <div className="space-y-3">
-      <div className="aspect-square overflow-hidden border border-ink-line bg-ink">
+      <div className="aspect-square overflow-hidden border border-neutral-200 bg-white">
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={imagenes[activa]}
@@ -45,8 +45,8 @@ export default function GaleriaProducto({
                 aria-current={indice === activa ? "true" : undefined}
                 className={`block aspect-square w-full overflow-hidden border transition-colors ${
                   indice === activa
-                    ? "border-neon"
-                    : "border-ink-line hover:border-neon/50"
+                    ? "border-black"
+                    : "border-neutral-200 hover:border-black"
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
