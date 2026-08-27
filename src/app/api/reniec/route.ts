@@ -1,8 +1,60 @@
+import { createAdminClient } from "@/lib/supabase/admin";
+
 const API_BASE =
   process.env.APIS_PERU_URL ?? "https://apisperu.com/api/v1/dni";
 
 /** Mensaje único para todo lo que falla, para no revelar qué comprobación saltó. */
 const ERROR_GENERICO = "No se pudo consultar el DNI.";
+
+const MAX_PETICIONES = 5;
+const VENTANA_SEGUNDOS = 60;
+
+/**
+ * IP del cliente.
+ *
+ * `x-forwarded-for` puede traer una cadena («cliente, proxy1, proxy2»); la
+ * primera entrada es el cliente original. Ojo: esa cabecera la puede falsear
+ * quien llame directamente al servidor, así que esto sólo es fiable si delante
+ * hay un proxy que la reescribe (Vercel, nginx, Cloudflare lo hacen).
+ */
+function ipDelCliente(request: Request): string {
+  const reenviada = request.headers.get("x-forwarded-for");
+  if (reenviada) {
+    const primera = reenviada.split(",")[0]?.trim();
+    if (primera) return primera;
+  }
+
+  return request.headers.get("x-real-ip")?.trim() ?? "";
+}
+
+/**
+ * Cuenta la petición y dice si se permite.
+ *
+ * Falla CERRADO: si no se puede comprobar el límite (falta la service_role key,
+ * la base no responde, no se ejecutó `rate_limit.sql`), se rechaza. Un control
+ * de abuso que se desactiva solo cuando algo va mal no protege nada, y el coste
+ * aquí es sólo que el comprador escriba su nombre a mano.
+ */
+async function dentroDelLimite(ip: string): Promise<boolean> {
+  try {
+    const supabase = createAdminClient();
+    const { data, error } = await supabase.rpc("verificar_rate_limit", {
+      p_ip: ip,
+      p_max: MAX_PETICIONES,
+      p_ventana_segundos: VENTANA_SEGUNDOS,
+    });
+
+    if (error) {
+      console.error("[reniec] No se pudo verificar el rate limit:", error);
+      return false;
+    }
+
+    return data === true;
+  } catch (e) {
+    console.error("[reniec] Rate limit no disponible:", e);
+    return false;
+  }
+}
 
 function esHostLocal(hostname: string): boolean {
   return (
@@ -86,6 +138,22 @@ export async function GET(request: Request) {
     return Response.json(
       { ok: false, error: "El DNI debe tener 8 dígitos." },
       { status: 400 },
+    );
+  }
+
+  // Se cuenta después de validar el formato para no gastar cupo en peticiones
+  // que nunca habrían llegado a la API externa. Sin IP identificable, todas
+  // esas peticiones comparten un mismo cubo en vez de quedar sin contar.
+  const ip = ipDelCliente(request) || "desconocida";
+
+  if (!(await dentroDelLimite(ip))) {
+    console.warn(`[reniec] Límite superado o no verificable para ${ip}.`);
+    return Response.json(
+      { ok: false, error: "Demasiadas consultas. Inténtalo en un minuto." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(VENTANA_SEGUNDOS) },
+      },
     );
   }
 

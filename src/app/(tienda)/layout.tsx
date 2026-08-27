@@ -101,18 +101,13 @@ export default function TiendaLayout({ children }: LayoutProps<"/">) {
             </div>
           </div>
 
-          <div className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t border-white/15 pt-6">
+          {/* Sin enlace al panel: se entra por la ruta secreta de `ADMIN_PATH`
+              (ver `src/proxy.ts`). Un enlace aquí delataría su existencia. */}
+          <div className="mt-12 border-t border-white/15 pt-6">
             <p className="text-xs text-white/40">
               &copy; {new Date().getFullYear()} Sixty Nine. Todos los derechos
               reservados.
             </p>
-
-            <Link
-              href="/admin"
-              className="text-[10px] font-bold tracking-[0.2em] text-white/40 uppercase transition-colors hover:text-white"
-            >
-              Panel
-            </Link>
           </div>
         </div>
       </footer>

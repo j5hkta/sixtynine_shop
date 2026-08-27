@@ -14,7 +14,8 @@ export const CATEGORIAS = [
   "Rodamientos",
   "Zapatillas",
   "Poleras",
-  "Polerones",
+  "Polos",
+  "Pantalones",
   "Gorros",
   "Accesorios",
 ] as const;

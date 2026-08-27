@@ -221,6 +221,18 @@ export type Database = {
         };
         Returns: string;
       };
+      /**
+       * Ver `supabase/rate_limit.sql`. `true` si la petición se permite.
+       * Sólo ejecutable con la `service_role` key.
+       */
+      verificar_rate_limit: {
+        Args: {
+          p_ip: string;
+          p_max: number;
+          p_ventana_segundos: number;
+        };
+        Returns: boolean;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
