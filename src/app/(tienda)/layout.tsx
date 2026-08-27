@@ -2,7 +2,7 @@ import Link from "next/link";
 import NextTopLoader from "nextjs-toploader";
 
 import Navbar from "@/components/tienda/Navbar";
-import { CATEGORIAS } from "@/lib/categorias";
+import { CATEGORIAS, rutaDeCategoria } from "@/lib/categorias";
 
 /**
  * Layout de la tienda pública.
@@ -55,7 +55,7 @@ export default function TiendaLayout({ children }: LayoutProps<"/">) {
                 {CATEGORIAS.slice(0, 5).map((categoria) => (
                   <li key={categoria}>
                     <Link
-                      href={`/productos?categoria=${encodeURIComponent(categoria)}`}
+                      href={rutaDeCategoria(categoria)}
                       className="text-xs text-white/60 transition-colors hover:text-white"
                     >
                       {categoria}

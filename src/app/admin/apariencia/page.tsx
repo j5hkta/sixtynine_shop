@@ -150,7 +150,7 @@ export default async function AparienciaPage({
               name="banner_link"
               type="text"
               defaultValue={config?.banner_link ?? "/productos"}
-              placeholder="/productos?categoria=Tablas"
+              placeholder="/productos/categoria/tablas"
               aria-describedby="link-ayuda"
               className={`${inputClase} pl-10 font-mono`}
             />
@@ -158,7 +158,8 @@ export default async function AparienciaPage({
 
           <p id="link-ayuda" className={ayudaClase}>
             Ruta interna, empezando por <code>/</code>. Ej:{" "}
-            <code>/productos</code> o <code>/productos?categoria=Zapatillas</code>.
+            <code>/productos</code> o{" "}
+            <code>/productos/categoria/zapatillas</code>.
             No se aceptan enlaces a otros dominios.
           </p>
         </div>

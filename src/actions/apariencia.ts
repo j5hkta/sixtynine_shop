@@ -50,7 +50,7 @@ export async function actualizarApariencia(formData: FormData) {
 
   if (link === null) {
     volverConError(
-      "El enlace debe ser una ruta interna que empiece por «/», por ejemplo /productos?categoria=Tablas.",
+      "El enlace debe ser una ruta interna que empiece por «/», por ejemplo /productos/categoria/tablas.",
     );
   }
 
