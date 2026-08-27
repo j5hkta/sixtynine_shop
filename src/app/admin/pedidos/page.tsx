@@ -1,4 +1,5 @@
-import { AlertTriangle, Inbox } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, Eye, Inbox } from "lucide-react";
 
 import SelectorEstadoPedido from "@/components/admin/SelectorEstadoPedido";
 import { fecha, moneda } from "@/lib/formato";
@@ -135,10 +136,21 @@ export default async function PedidosPage() {
                   </td>
 
                   <td className="px-4 py-4">
-                    <SelectorEstadoPedido
-                      id={pedido.id}
-                      estado={pedido.estado}
-                    />
+                    <div className="flex items-center justify-end gap-2">
+                      <SelectorEstadoPedido
+                        id={pedido.id}
+                        estado={pedido.estado}
+                      />
+
+                      <Link
+                        href={`/admin/pedidos/${pedido.id}`}
+                        aria-label={`Ver detalle del pedido ${pedido.id.slice(0, 8).toUpperCase()}`}
+                        title="Ver detalle"
+                        className="border border-ink-line p-2 text-neutral-500 transition-colors hover:border-neon/50 hover:bg-neon/10 hover:text-neon"
+                      >
+                        <Eye className="h-4 w-4" aria-hidden />
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}
