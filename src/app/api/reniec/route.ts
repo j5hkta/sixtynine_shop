@@ -1,6 +1,65 @@
 const API_BASE =
   process.env.APIS_PERU_URL ?? "https://apisperu.com/api/v1/dni";
 
+/** Mensaje único para todo lo que falla, para no revelar qué comprobación saltó. */
+const ERROR_GENERICO = "No se pudo consultar el DNI.";
+
+function esHostLocal(hostname: string): boolean {
+  return (
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1"
+  );
+}
+
+/** Origen (`https://host:puerto`) de una URL, o `null` si no es una URL válida. */
+function origenDe(valor: string | null): string | null {
+  if (!valor) return null;
+  try {
+    return new URL(valor).origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Comprueba que la petición venga de nuestra propia web.
+ *
+ * Se mira `origin` y, si no viene, `referer`. Los navegadores NO envían
+ * `Origin` en peticiones GET del mismo origen, así que quedarse sólo con esa
+ * cabecera rechazaría precisamente el uso legítimo: el `fetch` del checkout.
+ * `Referer` sí viaja con la política por defecto (`strict-origin-when-cross-origin`).
+ *
+ * ALCANCE REAL: ambas cabeceras las pone el cliente y cualquiera puede
+ * falsificarlas con curl. Esto corta el uso desde otras webs y el abuso
+ * casual, no a quien se lo proponga. Para eso hace falta límite por IP.
+ */
+function origenPermitido(request: Request): boolean {
+  const sitio = origenDe(process.env.NEXT_PUBLIC_SITE_URL ?? null);
+
+  // Sólo `NODE_ENV`. Es tentador aceptar además "la petición llegó a
+  // localhost", pero detrás de un proxy inverso (nginx, Vercel, un contenedor)
+  // Next ve TODAS las peticiones llegando por localhost, así que esa condición
+  // quedaría siempre activa en producción y bastaría enviar
+  // `Referer: http://localhost/` para saltarse la comprobación.
+  const permitirLocal = process.env.NODE_ENV !== "production";
+
+  const declarado =
+    origenDe(request.headers.get("origin")) ??
+    origenDe(request.headers.get("referer"));
+
+  // Sin ninguna de las dos cabeceras no hay forma de saber de dónde viene.
+  // Se rechaza: el checkout trata el fallo como "escribe el nombre a mano".
+  if (!declarado) return false;
+
+  if (sitio && declarado === sitio) return true;
+
+  if (permitirLocal) {
+    const hostDeclarado = new URL(declarado).hostname;
+    if (esHostLocal(hostDeclarado)) return true;
+  }
+
+  return false;
+}
+
 /**
  * Consulta de DNI para autocompletar el nombre en el checkout.
  *
@@ -12,6 +71,15 @@ const API_BASE =
  * que puede incluir detalles de la cuenta.
  */
 export async function GET(request: Request) {
+  if (!origenPermitido(request)) {
+    console.warn(
+      "[reniec] Petición rechazada por origen. origin=%s referer=%s",
+      request.headers.get("origin") ?? "(ninguno)",
+      request.headers.get("referer") ?? "(ninguno)",
+    );
+    return Response.json({ ok: false, error: ERROR_GENERICO }, { status: 403 });
+  }
+
   const dni = new URL(request.url).searchParams.get("dni")?.trim() ?? "";
 
   if (!/^\d{8}$/.test(dni)) {
@@ -28,7 +96,7 @@ export async function GET(request: Request) {
     // 503 y no 500: el servicio no está configurado, no es que haya fallado.
     // El checkout trata cualquier error como "escribe el nombre a mano".
     return Response.json(
-      { ok: false, error: "Consulta de DNI no disponible." },
+      { ok: false, error: ERROR_GENERICO },
       { status: 503 },
     );
   }
@@ -49,7 +117,7 @@ export async function GET(request: Request) {
         `[reniec] APIsPERU respondió ${respuesta.status} para el DNI consultado.`,
       );
       return Response.json(
-        { ok: false, error: "No se pudo consultar el DNI." },
+        { ok: false, error: ERROR_GENERICO },
         { status: 502 },
       );
     }
@@ -80,7 +148,7 @@ export async function GET(request: Request) {
   } catch (e) {
     console.error("[reniec] Fallo al consultar APIsPERU:", e);
     return Response.json(
-      { ok: false, error: "No se pudo consultar el DNI." },
+      { ok: false, error: ERROR_GENERICO },
       { status: 502 },
     );
   }
