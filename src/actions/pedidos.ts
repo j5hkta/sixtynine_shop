@@ -2,22 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 
+import { ESTADOS_PEDIDO, esEstadoPedidoValido } from "@/lib/pedidos";
 import { createClient } from "@/lib/supabase/server";
-import type { EstadoPedido } from "@/lib/supabase/types";
 
 const LISTADO = "/admin/pedidos";
-
-export const ESTADOS_PEDIDO: readonly EstadoPedido[] = [
-  "pendiente",
-  "confirmado",
-  "enviado",
-  "entregado",
-  "cancelado",
-];
-
-function esEstadoValido(valor: string): valor is EstadoPedido {
-  return (ESTADOS_PEDIDO as readonly string[]).includes(valor);
-}
 
 /**
  * Cambia el estado de un pedido desde el panel.
@@ -31,7 +19,7 @@ export async function actualizarEstadoPedido(id: string, nuevoEstado: string) {
     throw new Error("Falta el identificador del pedido.");
   }
 
-  if (!esEstadoValido(nuevoEstado)) {
+  if (!esEstadoPedidoValido(nuevoEstado)) {
     throw new Error(
       `Estado inválido: debe ser ${ESTADOS_PEDIDO.join(", ")}.`,
     );

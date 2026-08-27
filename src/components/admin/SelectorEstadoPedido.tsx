@@ -3,7 +3,8 @@
 import { useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
 
-import { actualizarEstadoPedido, ESTADOS_PEDIDO } from "@/actions/pedidos";
+import { actualizarEstadoPedido } from "@/actions/pedidos";
+import { ESTADOS_PEDIDO } from "@/lib/pedidos";
 import type { EstadoPedido } from "@/lib/supabase/types";
 
 export default function SelectorEstadoPedido({

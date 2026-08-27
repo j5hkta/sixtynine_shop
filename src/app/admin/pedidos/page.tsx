@@ -1,7 +1,9 @@
 import Link from "next/link";
-import { AlertTriangle, Eye, Inbox } from "lucide-react";
+import { AlertTriangle, Eye, Inbox, Search, X } from "lucide-react";
 
+import BadgeEstadoPedido from "@/components/admin/BadgeEstadoPedido";
 import SelectorEstadoPedido from "@/components/admin/SelectorEstadoPedido";
+import { ESTADOS_PEDIDO } from "@/lib/pedidos";
 import { fecha, moneda } from "@/lib/formato";
 import { createClient } from "@/lib/supabase/server";
 import type { EstadoPedido } from "@/lib/supabase/types";
@@ -10,26 +12,77 @@ export const metadata = {
   title: "Pedidos",
 };
 
-const estiloEstado: Record<EstadoPedido, string> = {
-  pendiente: "border-neon bg-neon text-ink",
-  confirmado: "border-amber-400/40 bg-amber-400/10 text-amber-300",
-  enviado: "border-blue-400/40 bg-blue-400/10 text-blue-300",
-  entregado: "border-emerald-400/40 bg-emerald-400/10 text-emerald-300",
-  cancelado: "border-ink-line bg-white/5 text-neutral-500",
-};
-
 const COLUMNAS = ["ID", "Cliente", "Fecha", "Total", "Estado"];
 
-export default async function PedidosPage() {
+/** Tope de filas por consulta, para que el listado no crezca sin control. */
+const LIMITE = 100;
+
+/**
+ * Limpia el término de búsqueda.
+ *
+ * Además de los comodines de LIKE (`%`, `_`), hay que quitar comas y
+ * paréntesis: el filtro `.or()` de PostgREST usa esos caracteres como
+ * separadores de su propia sintaxis, y una coma en la búsqueda partiría la
+ * condición en dos y devolvería resultados absurdos.
+ */
+function limpiarBusqueda(valor: string): string {
+  return valor
+    .replace(/[%_\\,()"']/g, "")
+    .trim()
+    .slice(0, 60);
+}
+
+function esEstado(valor: string): valor is EstadoPedido {
+  return (ESTADOS_PEDIDO as readonly string[]).includes(valor);
+}
+
+/** Construye una URL del listado conservando el resto de filtros. */
+function enlace(estado: string | null, buscar: string): string {
+  const params = new URLSearchParams();
+  if (estado) params.set("estado", estado);
+  if (buscar) params.set("buscar", buscar);
+  const query = params.toString();
+  return query ? `/admin/pedidos?${query}` : "/admin/pedidos";
+}
+
+export default async function PedidosPage({
+  searchParams,
+}: PageProps<"/admin/pedidos">) {
+  const params = await searchParams;
+
+  const estadoCrudo =
+    typeof params.estado === "string" ? params.estado : "todos";
+  const estado = esEstado(estadoCrudo) ? estadoCrudo : null;
+
+  const buscarCrudo = typeof params.buscar === "string" ? params.buscar : "";
+  const buscar = limpiarBusqueda(buscarCrudo);
+
   const supabase = await createClient();
-  const { data: pedidos, error } = await supabase
+
+  let consulta = supabase
     .from("pedidos")
     .select(
       "id, creado_en, cliente_nombre, cliente_telefono, cliente_dni, direccion_envio, total, estado",
-    )
-    .order("creado_en", { ascending: false });
+    );
 
-  const ingresos = (pedidos ?? [])
+  if (estado) {
+    consulta = consulta.eq("estado", estado);
+  }
+
+  if (buscar) {
+    consulta = consulta.or(
+      `cliente_nombre.ilike.%${buscar}%,cliente_dni.ilike.%${buscar}%`,
+    );
+  }
+
+  const { data: pedidos, error } = await consulta
+    .order("creado_en", { ascending: false })
+    .limit(LIMITE);
+
+  const filas = pedidos ?? [];
+  const hayFiltro = Boolean(estado || buscar);
+
+  const ingresos = filas
     .filter((p) => p.estado !== "cancelado")
     .reduce((suma, p) => suma + p.total, 0);
 
@@ -44,16 +97,109 @@ export default async function PedidosPage() {
         </h1>
         <span className="mt-4 block h-1 w-16 bg-neon" aria-hidden />
 
-        {pedidos && pedidos.length > 0 && (
+        {filas.length > 0 && (
           <p className="mt-4 text-sm text-neutral-500">
-            {pedidos.length} {pedidos.length === 1 ? "pedido" : "pedidos"} ·{" "}
+            {filas.length} {filas.length === 1 ? "pedido" : "pedidos"} ·{" "}
             <span className="font-mono text-neutral-300">
               {moneda.format(ingresos)}
             </span>{" "}
             sin contar cancelados.
+            {filas.length === LIMITE && (
+              <span className="text-neutral-600">
+                {" "}
+                Mostrando los {LIMITE} más recientes.
+              </span>
+            )}
           </p>
         )}
       </header>
+
+      {/* Filtros */}
+      <div className="flex flex-wrap items-center gap-4">
+        <nav aria-label="Filtrar por estado">
+          <ul className="flex flex-wrap gap-2">
+            <li>
+              <Chip href={enlace(null, buscar)} activo={estado === null}>
+                Todos
+              </Chip>
+            </li>
+            {ESTADOS_PEDIDO.map((opcion) => (
+              <li key={opcion}>
+                <Chip
+                  href={enlace(opcion, buscar)}
+                  activo={estado === opcion}
+                >
+                  {opcion}
+                </Chip>
+              </li>
+            ))}
+          </ul>
+        </nav>
+
+        {/* Formulario GET: sin JS de cliente, el navegador arma el query param. */}
+        <form
+          action="/admin/pedidos"
+          method="get"
+          role="search"
+          className="ml-auto flex items-center gap-2"
+        >
+          {estado && <input type="hidden" name="estado" value={estado} />}
+
+          <div className="relative">
+            <label htmlFor="buscar" className="sr-only">
+              Buscar por nombre o DNI
+            </label>
+            <Search
+              className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-neutral-600"
+              aria-hidden
+            />
+            <input
+              id="buscar"
+              name="buscar"
+              type="search"
+              defaultValue={buscarCrudo}
+              placeholder="Nombre o DNI..."
+              className="w-52 border border-ink-line bg-ink-soft py-2 pr-3 pl-9 text-sm text-neutral-200 transition-colors placeholder:text-neutral-600 focus:border-neon focus:outline-none"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className="border border-ink-line bg-ink-soft px-4 py-2 text-[11px] font-bold tracking-[0.15em] text-neutral-400 uppercase transition-colors hover:border-neon/50 hover:text-neon"
+          >
+            Buscar
+          </button>
+        </form>
+      </div>
+
+      {hayFiltro && (
+        <div className="flex flex-wrap items-center gap-3 border border-ink-line bg-ink-soft px-4 py-3 text-sm">
+          <span className="text-neutral-500">
+            Filtrando
+            {estado ? (
+              <>
+                {" "}
+                por estado <span className="text-neon">{estado}</span>
+              </>
+            ) : null}
+            {buscar ? (
+              <>
+                {estado ? " y" : ""} por{" "}
+                <span className="text-neon">«{buscar}»</span>
+              </>
+            ) : null}
+            .
+          </span>
+
+          <Link
+            href="/admin/pedidos"
+            className="ml-auto inline-flex items-center gap-1 text-[11px] font-bold tracking-[0.15em] text-neutral-500 uppercase transition-colors hover:text-neon"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+            Limpiar
+          </Link>
+        </div>
+      )}
 
       {error && (
         <p
@@ -65,19 +211,29 @@ export default async function PedidosPage() {
         </p>
       )}
 
-      {!error && pedidos && pedidos.length === 0 && (
+      {!error && filas.length === 0 && (
         <div className="flex flex-col items-center border border-dashed border-ink-line bg-ink-soft px-6 py-16 text-center">
           <Inbox className="h-8 w-8 text-neutral-600" aria-hidden />
           <p className="mt-4 text-sm font-bold tracking-wide text-white uppercase">
-            Todavía no hay pedidos
+            {hayFiltro ? "Sin coincidencias" : "Todavía no hay pedidos"}
           </p>
           <p className="mt-1 text-sm text-neutral-500">
-            Aparecerán aquí en cuanto alguien complete el checkout.
+            {hayFiltro
+              ? "Ningún pedido cumple con los filtros aplicados."
+              : "Aparecerán aquí en cuanto alguien complete el checkout."}
           </p>
+          {hayFiltro && (
+            <Link
+              href="/admin/pedidos"
+              className="mt-6 bg-neon px-5 py-3 text-[11px] font-black tracking-[0.15em] text-ink uppercase transition-colors hover:bg-white"
+            >
+              Ver todos los pedidos
+            </Link>
+          )}
         </div>
       )}
 
-      {pedidos && pedidos.length > 0 && (
+      {filas.length > 0 && (
         <div className="overflow-x-auto border border-ink-line bg-ink-soft">
           <table className="w-full min-w-[52rem] border-collapse text-sm">
             <thead>
@@ -92,13 +248,13 @@ export default async function PedidosPage() {
                   </th>
                 ))}
                 <th scope="col" className="px-4 py-3">
-                  <span className="sr-only">Cambiar estado</span>
+                  <span className="sr-only">Acciones</span>
                 </th>
               </tr>
             </thead>
 
             <tbody>
-              {pedidos.map((pedido) => (
+              {filas.map((pedido) => (
                 <tr
                   key={pedido.id}
                   className="border-b border-ink-line/60 transition-colors last:border-b-0 hover:bg-white/[0.02]"
@@ -128,11 +284,7 @@ export default async function PedidosPage() {
                   </td>
 
                   <td className="px-4 py-4">
-                    <span
-                      className={`inline-block border px-2 py-1 text-[10px] font-bold tracking-widest uppercase ${estiloEstado[pedido.estado]}`}
-                    >
-                      {pedido.estado}
-                    </span>
+                    <BadgeEstadoPedido estado={pedido.estado} />
                   </td>
 
                   <td className="px-4 py-4">
@@ -159,5 +311,29 @@ export default async function PedidosPage() {
         </div>
       )}
     </div>
+  );
+}
+
+function Chip({
+  href,
+  activo,
+  children,
+}: {
+  href: string;
+  activo: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={activo ? "page" : undefined}
+      className={`inline-block border px-3 py-1.5 text-[11px] font-bold tracking-[0.15em] uppercase transition-colors ${
+        activo
+          ? "border-neon bg-neon text-ink"
+          : "border-ink-line text-neutral-400 hover:border-neon/50 hover:text-neon"
+      }`}
+    >
+      {children}
+    </Link>
   );
 }
