@@ -2,19 +2,8 @@ import Link from "next/link";
 import { ImageUp } from "lucide-react";
 
 import BotonGuardar from "@/components/admin/BotonGuardar";
+import { CATEGORIAS } from "@/lib/categorias";
 import type { EstadoProducto } from "@/lib/supabase/types";
-
-export const CATEGORIAS = [
-  "Tablas",
-  "Ruedas",
-  "Trucks",
-  "Rodamientos",
-  "Zapatillas",
-  "Poleras",
-  "Polerones",
-  "Gorros",
-  "Accesorios",
-];
 
 const ESTADOS: { valor: EstadoProducto; etiqueta: string; ayuda: string }[] = [
   { valor: "activo", etiqueta: "Activo", ayuda: "visible en la tienda" },
@@ -77,9 +66,15 @@ export default function ProductoForm({
   etiquetaBoton,
 }: ProductoFormProps) {
   // Si el producto tiene una categoría que ya no está en la lista, se conserva
-  // como opción para no perderla silenciosamente al guardar.
-  const categorias =
-    valores.categoria && !CATEGORIAS.includes(valores.categoria)
+  // como opción para no perderla silenciosamente al guardar. Es justo lo que
+  // pasa con los productos que quedaron en "Polerones": el select los muestra
+  // con su valor actual en vez de reasignarlos solo.
+  const enLaLista = (CATEGORIAS as readonly string[]).includes(
+    valores.categoria,
+  );
+
+  const categorias: readonly string[] =
+    valores.categoria && !enLaLista
       ? [valores.categoria, ...CATEGORIAS]
       : CATEGORIAS;
 
