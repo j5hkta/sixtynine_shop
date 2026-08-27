@@ -11,6 +11,15 @@
  * Cuando el proyecto crezca puedes regenerar este tipo con:
  *   npx supabase gen types typescript --project-id <TU_PROJECT_ID> > src/lib/supabase/types.ts
  */
+/** Valor JSON arbitrario, para las columnas y parámetros `jsonb`. */
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[];
+
 export type EstadoProducto = "activo" | "borrador" | "agotado";
 
 /** Roles de `public.perfiles` (ver `supabase/roles_schema.sql`). */
@@ -171,7 +180,19 @@ export type Database = {
       };
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      /** Ver `supabase/seguridad_pedidos.sql`. Devuelve el id del pedido. */
+      procesar_checkout: {
+        Args: {
+          p_cliente_nombre: string;
+          p_cliente_telefono: string;
+          p_cliente_dni: string;
+          p_direccion_envio: string;
+          p_items: Json;
+        };
+        Returns: string;
+      };
+    };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
   };
