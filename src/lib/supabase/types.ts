@@ -112,6 +112,8 @@ export type Database = {
           cliente_dni: string;
           direccion_envio: string;
           total: number;
+          costo_envio: number;
+          zona_envio: string | null;
           estado: EstadoPedido;
         };
         Insert: {
@@ -122,6 +124,8 @@ export type Database = {
           cliente_dni: string;
           direccion_envio: string;
           total: number;
+          costo_envio?: number;
+          zona_envio?: string | null;
           estado?: EstadoPedido;
         };
         Update: {
@@ -132,6 +136,8 @@ export type Database = {
           cliente_dni?: string;
           direccion_envio?: string;
           total?: number;
+          costo_envio?: number;
+          zona_envio?: string | null;
           estado?: EstadoPedido;
         };
         Relationships: [];
@@ -199,7 +205,11 @@ export type Database = {
     };
     Views: { [_ in never]: never };
     Functions: {
-      /** Ver `supabase/seguridad_pedidos.sql`. Devuelve el id del pedido. */
+      /**
+       * Ver `supabase/seguridad_pedidos.sql` y `supabase/envio_schema.sql`.
+       * Devuelve el id del pedido. `p_zona_envio` es 'lima' o 'provincia'; el
+       * costo lo decide la función, no quien la llama.
+       */
       procesar_checkout: {
         Args: {
           p_cliente_nombre: string;
@@ -207,6 +217,7 @@ export type Database = {
           p_cliente_dni: string;
           p_direccion_envio: string;
           p_items: Json;
+          p_zona_envio: string;
         };
         Returns: string;
       };

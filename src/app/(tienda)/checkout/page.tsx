@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import {
   AlertTriangle,
@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { procesarPedido } from "@/actions/checkout";
+import { costoEnvio, esZonaValida, ZONAS, ZONAS_ENVIO, type ZonaEnvio } from "@/lib/envio";
 import { moneda } from "@/lib/formato";
 import { useCarrito, useHidratado, useTotalPrecio } from "@/store/carrito";
 
@@ -31,8 +32,52 @@ export default function CheckoutPage() {
   const [error, setError] = useState<string | null>(null);
   const [enviando, iniciarEnvio] = useTransition();
 
+  const [dni, setDni] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [zona, setZona] = useState<ZonaEnvio | "">("");
+  const [consultandoDni, setConsultandoDni] = useState(false);
+
+  // Evita repetir la consulta del mismo DNI si el usuario borra y reescribe el
+  // último dígito, que dispararía el fetch en cada pulsación.
+  const ultimoDniConsultado = useRef<string | null>(null);
+
+  const envio = zona ? costoEnvio(zona) : 0;
+  const total = subtotal + envio;
+
+  function alCambiarDni(valor: string) {
+    const soloDigitos = valor.replace(/\D/g, "").slice(0, 8);
+    setDni(soloDigitos);
+
+    if (soloDigitos.length !== 8 || ultimoDniConsultado.current === soloDigitos) {
+      return;
+    }
+
+    ultimoDniConsultado.current = soloDigitos;
+    setConsultandoDni(true);
+
+    // Autocompletado silencioso: si la consulta falla, el comprador escribe el
+    // nombre a mano y no se le muestra ningún error. No es un paso obligatorio.
+    fetch(`/api/reniec?dni=${soloDigitos}`)
+      .then((r) => r.json())
+      .then((datos: { ok?: boolean; nombreCompleto?: string }) => {
+        // El usuario pudo seguir escribiendo mientras llegaba la respuesta.
+        if (datos?.ok && datos.nombreCompleto) {
+          setNombre(datos.nombreCompleto);
+        }
+      })
+      .catch(() => {
+        /* silencio deliberado */
+      })
+      .finally(() => setConsultandoDni(false));
+  }
+
   function handleSubmit(evento: React.FormEvent<HTMLFormElement>) {
     evento.preventDefault();
+
+    if (!esZonaValida(zona)) {
+      setError("Selecciona una zona de envío.");
+      return;
+    }
 
     // Se captura antes de entrar en la transición: dentro del callback async
     // `evento.currentTarget` ya sería null.
@@ -80,7 +125,7 @@ export default function CheckoutPage() {
         <span className="mt-4 block h-1 w-16 bg-black" aria-hidden />
         <Link
           href="/productos"
-          className="mt-10 bg-black px-8 py-4 text-xs font-black tracking-[0.2em] text-white uppercase transition-colors hover:opacity-80"
+          className="mt-10 bg-black px-8 py-4 text-xs font-black tracking-[0.2em] text-white uppercase transition-opacity hover:opacity-80"
         >
           Ir al Catálogo
         </Link>
@@ -122,46 +167,42 @@ export default function CheckoutPage() {
           {error && (
             <p
               role="alert"
-              className="flex items-start gap-2 border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-700"
+              className="flex items-start gap-2 border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700"
             >
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
               {error}
             </p>
           )}
 
-          <div className="space-y-2">
-            <label htmlFor="nombre" className={labelClase}>
-              Nombre Completo
-            </label>
-            <input
-              id="nombre"
-              name="nombre"
-              type="text"
-              required
-              autoComplete="name"
-              placeholder="Juan Pérez Quispe"
-              className={inputClase}
-            />
-          </div>
-
+          {/* DNI primero: al completarlo se rellena el nombre solo. */}
           <div className="grid gap-6 sm:grid-cols-2">
             <div className="space-y-2">
               <label htmlFor="dni" className={labelClase}>
                 DNI
               </label>
-              <input
-                id="dni"
-                name="dni"
-                type="text"
-                inputMode="numeric"
-                required
-                maxLength={8}
-                placeholder="12345678"
-                aria-describedby="dni-ayuda"
-                className={`${inputClase} font-mono`}
-              />
+              <div className="relative">
+                <input
+                  id="dni"
+                  name="dni"
+                  type="text"
+                  inputMode="numeric"
+                  required
+                  maxLength={8}
+                  value={dni}
+                  onChange={(e) => alCambiarDni(e.target.value)}
+                  placeholder="12345678"
+                  aria-describedby="dni-ayuda"
+                  className={`${inputClase} font-mono`}
+                />
+                {consultandoDni && (
+                  <Loader2
+                    className="absolute top-1/2 right-3 h-4 w-4 -translate-y-1/2 animate-spin text-neutral-400"
+                    aria-hidden
+                  />
+                )}
+              </div>
               <p id="dni-ayuda" className={ayudaClase}>
-                8 dígitos, sin puntos ni guiones.
+                8 dígitos. Completamos tu nombre automáticamente.
               </p>
             </div>
 
@@ -187,6 +228,51 @@ export default function CheckoutPage() {
           </div>
 
           <div className="space-y-2">
+            <label htmlFor="nombre" className={labelClase}>
+              Nombre Completo
+            </label>
+            <input
+              id="nombre"
+              name="nombre"
+              type="text"
+              required
+              autoComplete="name"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              placeholder="Juan Pérez Quispe"
+              className={inputClase}
+            />
+            <p className={ayudaClase}>
+              Puedes corregirlo si no coincide con tu documento.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="zona_envio" className={labelClase}>
+              Zona de Envío
+            </label>
+            <select
+              id="zona_envio"
+              name="zona_envio"
+              required
+              value={zona}
+              onChange={(e) => {
+                setZona(e.target.value as ZonaEnvio | "");
+                setError(null);
+              }}
+              className={inputClase}
+            >
+              <option value="">Selecciona una zona...</option>
+              {ZONAS.map((clave) => (
+                <option key={clave} value={clave}>
+                  {ZONAS_ENVIO[clave].etiqueta} (
+                  {moneda.format(ZONAS_ENVIO[clave].costo)})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-2">
             <label htmlFor="direccion" className={labelClase}>
               Dirección de Envío
             </label>
@@ -207,7 +293,7 @@ export default function CheckoutPage() {
           <button
             type="submit"
             disabled={enviando}
-            className="flex w-full items-center justify-center gap-2 bg-black py-4 text-xs font-black tracking-[0.15em] text-white uppercase transition-colors hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex w-full items-center justify-center gap-2 bg-black py-4 text-xs font-black tracking-[0.15em] text-white uppercase transition-opacity hover:opacity-80 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {enviando ? (
               <>
@@ -223,8 +309,7 @@ export default function CheckoutPage() {
           </button>
 
           <p className={ayudaClase}>
-            Al confirmar te llevamos a Mercado Pago para completar el pago. El
-            envío se coordina después por WhatsApp.
+            Al confirmar te llevamos a Mercado Pago para completar el pago.
           </p>
         </form>
 
@@ -253,18 +338,46 @@ export default function CheckoutPage() {
             ))}
           </ul>
 
+          <dl className="mt-6 space-y-3 border-b border-neutral-200 pb-6 text-sm">
+            <div className="flex items-baseline justify-between gap-4">
+              <dt className="text-neutral-600">Subtotal</dt>
+              <dd className="font-mono text-black">
+                {moneda.format(subtotal)}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-4">
+              <dt className="text-neutral-600">
+                Envío
+                {zona && (
+                  <span className="block text-xs text-neutral-400">
+                    {ZONAS_ENVIO[zona].etiqueta}
+                  </span>
+                )}
+              </dt>
+              <dd className="font-mono text-black">
+                {zona ? (
+                  moneda.format(envio)
+                ) : (
+                  <span className="font-sans text-xs text-neutral-400">
+                    Elige una zona
+                  </span>
+                )}
+              </dd>
+            </div>
+          </dl>
+
           <div className="mt-6 flex items-baseline justify-between gap-4">
             <span className="text-[11px] font-bold tracking-[0.2em] text-neutral-600 uppercase">
               Total
             </span>
             <span className="font-mono text-2xl font-black text-black">
-              {moneda.format(subtotal)}
+              {moneda.format(total)}
             </span>
           </div>
 
           <p className="mt-3 text-xs leading-relaxed text-neutral-400">
-            Los precios se vuelven a verificar contra el catálogo al confirmar.
-            El envío se coordina por WhatsApp.
+            Los precios y el stock se vuelven a verificar contra el catálogo al
+            confirmar.
           </p>
         </aside>
       </div>

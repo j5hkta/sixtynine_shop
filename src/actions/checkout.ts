@@ -1,5 +1,6 @@
 "use server";
 
+import { costoEnvio, esZonaValida, ZONAS_ENVIO, type ZonaEnvio } from "@/lib/envio";
 import { getPreferenceClient } from "@/lib/mercadopago";
 import { createClient } from "@/lib/supabase/server";
 import type { ItemCarrito } from "@/store/carrito";
@@ -71,6 +72,14 @@ export async function procesarPedido(
     return { ok: false, error: cliente };
   }
 
+  // La zona viaja en el formulario; el COSTO nunca. Si el cliente mandara el
+  // importe podria pedirse un envio de S/ 0.00. `procesar_checkout()` vuelve a
+  // validar la zona y decide el precio por su cuenta.
+  const zona = texto(formData, "zona_envio");
+  if (!esZonaValida(zona)) {
+    return { ok: false, error: "Selecciona una zona de envío." };
+  }
+
   if (!Array.isArray(carrito) || carrito.length === 0) {
     return { ok: false, error: "Tu carrito está vacío." };
   }
@@ -93,6 +102,7 @@ export async function procesarPedido(
     p_cliente_dni: cliente.dni,
     p_direccion_envio: cliente.direccion,
     p_items: items,
+    p_zona_envio: zona,
   });
 
   if (error) {
@@ -120,7 +130,7 @@ export async function procesarPedido(
   }
 
   try {
-    const url = await crearPreferenciaDePago(pedidoId, cliente, items);
+    const url = await crearPreferenciaDePago(pedidoId, cliente, items, zona);
     return { ok: true, pedidoId, url };
   } catch (e) {
     // El pedido ya existe y el stock ya se descontó, pero nadie va a pagarlo.
@@ -147,6 +157,7 @@ async function crearPreferenciaDePago(
   pedidoId: string,
   cliente: DatosCliente,
   items: { producto_id: string; cantidad: number; talla: string | null }[],
+  zona: ZonaEnvio,
 ): Promise<string> {
   const supabase = await createClient();
 
@@ -166,6 +177,17 @@ async function crearPreferenciaDePago(
       unit_price: producto?.precio ?? 0,
       currency_id: "PEN",
     };
+  });
+
+  // El envío va como una línea más de la preferencia. Sin esto, Mercado Pago
+  // cobraría sólo los productos y el importe no cuadraría con `pedidos.total`,
+  // que sí lo incluye — y el webhook, que compara ambos, rechazaría el pago.
+  itemsMP.push({
+    id: `envio-${zona}`,
+    title: `Costo de Envío — ${ZONAS_ENVIO[zona].etiqueta}`,
+    quantity: 1,
+    unit_price: costoEnvio(zona),
+    currency_id: "PEN",
   });
 
   const preference = getPreferenceClient();

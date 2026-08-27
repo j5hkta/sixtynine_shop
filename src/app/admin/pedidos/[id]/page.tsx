@@ -61,9 +61,15 @@ export default async function DetallePedidoPage({
         100,
     ) / 100;
 
-  // El total guardado es el que se cobró. Si no cuadra con la suma de líneas,
-  // alguien editó datos a mano y conviene saberlo.
-  const descuadre = Math.abs(sumaLineas - pedido.total) > 0.005;
+  // `pedidos.total` incluye el envío, así que la comparación tiene que sumarlo:
+  // contrastarlo sólo contra las líneas haría saltar la alerta en todos los
+  // pedidos con envío cobrado.
+  const envio = pedido.costo_envio ?? 0;
+  const esperado = Math.round((sumaLineas + envio) * 100) / 100;
+
+  // El total guardado es el que se cobró. Si no cuadra, alguien editó datos a
+  // mano y conviene saberlo.
+  const descuadre = Math.abs(esperado - pedido.total) > 0.005;
 
   return (
     <div className="space-y-8">
@@ -97,8 +103,8 @@ export default async function DetallePedidoPage({
           className="flex items-start gap-2 border border-amber-400/40 bg-amber-400/10 px-4 py-3 text-sm text-amber-300"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          El total guardado ({moneda.format(pedido.total)}) no coincide con la
-          suma de las líneas ({moneda.format(sumaLineas)}). Revisa si se editó
+          El total guardado ({moneda.format(pedido.total)}) no coincide con las
+          líneas más el envío ({moneda.format(esperado)}). Revisa si se editó
           algo a mano.
         </p>
       )}
@@ -220,7 +226,29 @@ export default async function DetallePedidoPage({
             </ul>
           )}
 
-          <div className="mt-6 flex items-baseline justify-between gap-4 border-t border-ink-line pt-6">
+          <dl className="mt-6 space-y-2 border-t border-ink-line pt-6 text-sm">
+            <div className="flex items-baseline justify-between gap-4">
+              <dt className="text-neutral-400">Productos</dt>
+              <dd className="font-mono text-neutral-300">
+                {moneda.format(sumaLineas)}
+              </dd>
+            </div>
+            <div className="flex items-baseline justify-between gap-4">
+              <dt className="text-neutral-400">
+                Envío
+                {pedido.zona_envio && (
+                  <span className="ml-2 text-xs text-neutral-600 capitalize">
+                    {pedido.zona_envio}
+                  </span>
+                )}
+              </dt>
+              <dd className="font-mono text-neutral-300">
+                {moneda.format(envio)}
+              </dd>
+            </div>
+          </dl>
+
+          <div className="mt-4 flex items-baseline justify-between gap-4 border-t border-ink-line pt-4">
             <span className="text-[11px] font-bold tracking-[0.2em] text-neutral-400 uppercase">
               Total
             </span>
