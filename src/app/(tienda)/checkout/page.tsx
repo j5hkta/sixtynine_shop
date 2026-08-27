@@ -6,7 +6,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Loader2,
-  MessageCircle,
+  ShieldCheck,
   ShoppingBag,
 } from "lucide-react";
 
@@ -48,8 +48,8 @@ export default function CheckoutPage() {
       }
 
       limpiarCarrito();
-      // Salida del sitio hacia WhatsApp: no es una navegación del router, así
-      // que `window.location.href` es lo correcto y no `router.push`.
+      // Salida del sitio hacia Mercado Pago: no es una navegación del router,
+      // así que `window.location.href` es lo correcto y no `router.push`.
       window.location.href = resultado.url;
     });
   }
@@ -212,19 +212,19 @@ export default function CheckoutPage() {
             {enviando ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                Verificando stock...
+                Preparando el pago...
               </>
             ) : (
               <>
-                <MessageCircle className="h-4 w-4" aria-hidden />
-                Confirmar y Pagar vía WhatsApp
+                <ShieldCheck className="h-4 w-4" aria-hidden />
+                Pagar de forma Segura
               </>
             )}
           </button>
 
           <p className={ayudaClase}>
-            Al confirmar te llevamos a WhatsApp con el resumen del pedido listo
-            para enviar. El pago y el envío se coordinan por ahí.
+            Al confirmar te llevamos a Mercado Pago para completar el pago. El
+            envío se coordina después por WhatsApp.
           </p>
         </form>
 

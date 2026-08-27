@@ -1,24 +1,19 @@
 "use server";
 
+import { getPreferenceClient } from "@/lib/mercadopago";
 import { createClient } from "@/lib/supabase/server";
 import type { ItemCarrito } from "@/store/carrito";
-
-/** Numero de WhatsApp de la tienda (formato internacional, sin +). */
-const WHATSAPP = "51992657906";
 
 export type ResultadoPedido =
   | { ok: true; url: string; pedidoId: string }
   | { ok: false; error: string };
 
+/** Base pública del sitio, para las URLs de retorno y el webhook. */
+const SITIO = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
 function texto(formData: FormData, campo: string): string {
   const valor = formData.get(campo);
   return typeof valor === "string" ? valor.trim() : "";
-}
-
-/** Precio con 2 decimales, en soles. Duplicado a proposito: `src/lib/formato`
- *  es un modulo de UI y este archivo corre solo en el servidor. */
-function soles(monto: number): string {
-  return `S/ ${monto.toFixed(2)}`;
 }
 
 type DatosCliente = {
@@ -29,7 +24,7 @@ type DatosCliente = {
 };
 
 /**
- * Validacion en el cliente-de-servidor, para dar un mensaje util sin gastar un
+ * Validacion en el servidor de Next, para dar un mensaje util sin gastar un
  * viaje a la base de datos. `procesar_checkout()` repite estas mismas reglas:
  * esta capa es comodidad, la de Postgres es la que manda.
  */
@@ -56,16 +51,16 @@ function validarCliente(formData: FormData): DatosCliente | string {
 }
 
 /**
- * Cierra un pedido y devuelve el enlace de WhatsApp con el resumen.
+ * Cierra un pedido y devuelve la URL de pago de Mercado Pago.
  *
- * Toda la logica de negocio vive ahora en `public.procesar_checkout()`: valida
- * el stock con las filas bloqueadas (`FOR UPDATE`), lo descuenta, calcula el
- * total con los precios reales e inserta cabecera y detalle, todo en una sola
- * transaccion. Del carrito del navegador solo se aceptan *que* producto, *que*
- * talla y *cuantas* unidades; el precio que traiga se descarta.
+ * El orden importa: primero se registra el pedido con `procesar_checkout()`
+ * (que valida stock con las filas bloqueadas, lo descuenta y calcula el total
+ * con los precios reales, todo en una transaccion), y solo despues se crea la
+ * preferencia de pago. Asi nunca se cobra por algo que la base de datos ya
+ * rechazo.
  *
- * Esta Server Action ya no inserta nada: `anon` ni siquiera tiene permiso de
- * INSERT sobre `pedidos`.
+ * Del carrito del navegador solo se aceptan *que* producto, *que* talla y
+ * *cuantas* unidades; el precio que traiga se descarta.
  */
 export async function procesarPedido(
   formData: FormData,
@@ -124,23 +119,31 @@ export async function procesarPedido(
     };
   }
 
-  return {
-    ok: true,
-    pedidoId,
-    url: await enlaceWhatsApp(pedidoId, cliente, items),
-  };
+  try {
+    const url = await crearPreferenciaDePago(pedidoId, cliente, items);
+    return { ok: true, pedidoId, url };
+  } catch (e) {
+    // El pedido ya existe y el stock ya se descontó, pero nadie va a pagarlo.
+    // Se avisa con el número para poder rescatarlo o cancelarlo a mano.
+    console.error(
+      `[checkout] Pedido ${pedidoId} creado pero falló la preferencia de MP:`,
+      e,
+    );
+    return {
+      ok: false,
+      error: `Registramos tu pedido #${pedidoId.slice(0, 8).toUpperCase()} pero no pudimos abrir la pasarela de pago. Escríbenos con ese número.`,
+    };
+  }
 }
 
 /**
- * Arma el texto para WhatsApp. Los titulos y precios se releen de `productos`
- * (SELECT publico) porque `procesar_checkout()` devuelve solo el id y las
- * tablas de pedidos no son legibles para `anon`.
+ * Crea la preferencia de Checkout Pro y devuelve su URL.
  *
- * El pedido guardado en la base de datos es el registro que manda; este
- * mensaje es una copia de cortesia e incluye el numero de pedido para poder
- * contrastarlo.
+ * Los titulos y precios se releen de `productos` (SELECT publico) porque
+ * `procesar_checkout()` devuelve solo el id y las tablas de pedidos no son
+ * legibles sin sesion de admin.
  */
-async function enlaceWhatsApp(
+async function crearPreferenciaDePago(
   pedidoId: string,
   cliente: DatosCliente,
   items: { producto_id: string; cantidad: number; talla: string | null }[],
@@ -154,37 +157,48 @@ async function enlaceWhatsApp(
 
   const porId = new Map((productos ?? []).map((p) => [p.id, p]));
 
-  const lineas = items.map((item) => {
+  const itemsMP = items.map((item, indice) => {
     const producto = porId.get(item.producto_id);
-    const titulo = producto?.titulo ?? "Producto";
-    const subtotal = (producto?.precio ?? 0) * item.cantidad;
-    return { titulo, talla: item.talla, cantidad: item.cantidad, subtotal };
+    return {
+      id: `${item.producto_id}-${indice}`,
+      title: `${producto?.titulo ?? "Producto"}${item.talla ? ` (Talla ${item.talla})` : ""}`,
+      quantity: item.cantidad,
+      unit_price: producto?.precio ?? 0,
+      currency_id: "PEN",
+    };
   });
 
-  const total =
-    Math.round(lineas.reduce((suma, l) => suma + l.subtotal, 0) * 100) / 100;
+  const preference = getPreferenceClient();
 
-  const mensaje = [
-    "*NUEVO PEDIDO — SIXTY NINE SKATE & APPAREL*",
-    `Pedido: #${pedidoId.slice(0, 8).toUpperCase()}`,
-    "",
-    `*Cliente:* ${cliente.nombre}`,
-    `*DNI:* ${cliente.dni}`,
-    `*Teléfono:* ${cliente.telefono}`,
-    `*Dirección de envío:* ${cliente.direccion}`,
-    "",
-    "*Productos:*",
-    lineas
-      .map(
-        (l) =>
-          `• ${l.titulo}${l.talla ? ` (Talla ${l.talla})` : ""} x${l.cantidad} — ${soles(l.subtotal)}`,
-      )
-      .join("\n"),
-    "",
-    `*TOTAL: ${soles(total)}*`,
-    "",
-    "_Envío por coordinar._",
-  ].join("\n");
+  const respuesta = await preference.create({
+    body: {
+      items: itemsMP,
+      // Es el hilo que une el pago de MP con nuestro pedido: el webhook lo lee
+      // para saber qué fila de `pedidos` confirmar. Sin esto no hay forma de
+      // relacionarlos.
+      external_reference: pedidoId,
+      payer: {
+        name: cliente.nombre,
+        phone: { area_code: "51", number: cliente.telefono },
+      },
+      back_urls: {
+        success: `${SITIO}/?pago=exito&pedido=${pedidoId}`,
+        pending: `${SITIO}/?pago=pendiente&pedido=${pedidoId}`,
+        failure: `${SITIO}/carrito?pago=error`,
+      },
+      auto_return: "approved",
+      notification_url: `${SITIO}/api/webhooks/mp`,
+      statement_descriptor: "SIXTYNINE",
+    },
+  });
 
-  return `https://wa.me/${WHATSAPP}?text=${encodeURIComponent(mensaje)}`;
+  // `sandbox_init_point` es el entorno de pruebas; con credenciales de
+  // producción MP no lo devuelve, así que `init_point` es el que manda.
+  const url = respuesta.init_point ?? respuesta.sandbox_init_point;
+
+  if (!url) {
+    throw new Error("Mercado Pago no devolvió una URL de pago.");
+  }
+
+  return url;
 }
