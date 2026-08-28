@@ -2,6 +2,7 @@
 
 import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -24,9 +25,9 @@ const labelClase =
 const ayudaClase = "text-xs text-neutral-400";
 
 export default function CheckoutPage() {
+  const router = useRouter();
   const hidratado = useHidratado();
   const items = useCarrito((estado) => estado.items);
-  const limpiarCarrito = useCarrito((estado) => estado.limpiarCarrito);
   const subtotal = useTotalPrecio();
 
   const [error, setError] = useState<string | null>(null);
@@ -87,15 +88,14 @@ export default function CheckoutPage() {
     iniciarEnvio(async () => {
       const resultado = await procesarPedido(formData, items);
 
-      if (!resultado.ok) {
+      if (!resultado.exito) {
         setError(resultado.error);
         return;
       }
 
-      limpiarCarrito();
-      // Salida del sitio hacia Mercado Pago: no es una navegación del router,
-      // así que `window.location.href` es lo correcto y no `router.push`.
-      window.location.href = resultado.url;
+      // El carrito se vacía en la pantalla de éxito, no aquí: si el navegador
+      // se cierra a mitad de la navegación, el comprador conserva su selección.
+      router.push(`/checkout/exito?id=${resultado.pedidoId}`);
     });
   }
 
@@ -298,18 +298,18 @@ export default function CheckoutPage() {
             {enviando ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-                Preparando el pago...
+                Registrando pedido...
               </>
             ) : (
               <>
                 <ShieldCheck className="h-4 w-4" aria-hidden />
-                Pagar de forma Segura
+                Confirmar Pedido
               </>
             )}
           </button>
 
           <p className={ayudaClase}>
-            Al confirmar te llevamos a Mercado Pago para completar el pago.
+            Al confirmar reservamos tu pedido y te damos las instrucciones para yapear.
           </p>
         </form>
 

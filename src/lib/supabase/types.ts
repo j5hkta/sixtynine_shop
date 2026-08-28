@@ -222,6 +222,14 @@ export type Database = {
         Returns: string;
       };
       /**
+       * Ver `supabase/consulta_pedido_publico.sql`. Devuelve una fila (o
+       * ninguna). Sólo el importe y el estado: nada del cliente.
+       */
+      obtener_resumen_pedido: {
+        Args: { p_id: string };
+        Returns: { total: number; costo_envio: number; estado: string }[];
+      };
+      /**
        * Ver `supabase/rate_limit.sql`. `true` si la petición se permite.
        * Sólo ejecutable con la `service_role` key.
        */

@@ -1,16 +1,12 @@
 "use server";
 
-import { costoEnvio, esZonaValida, ZONAS_ENVIO, type ZonaEnvio } from "@/lib/envio";
-import { getPreferenceClient } from "@/lib/mercadopago";
+import { esZonaValida } from "@/lib/envio";
 import { createClient } from "@/lib/supabase/server";
 import type { ItemCarrito } from "@/store/carrito";
 
 export type ResultadoPedido =
-  | { ok: true; url: string; pedidoId: string }
-  | { ok: false; error: string };
-
-/** Base pública del sitio, para las URLs de retorno y el webhook. */
-const SITIO = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+  | { exito: true; pedidoId: string }
+  | { exito: false; error: string };
 
 function texto(formData: FormData, campo: string): string {
   const valor = formData.get(campo);
@@ -52,16 +48,17 @@ function validarCliente(formData: FormData): DatosCliente | string {
 }
 
 /**
- * Cierra un pedido y devuelve la URL de pago de Mercado Pago.
+ * Registra el pedido y devuelve su identificador.
  *
- * El orden importa: primero se registra el pedido con `procesar_checkout()`
- * (que valida stock con las filas bloqueadas, lo descuenta y calcula el total
- * con los precios reales, todo en una transaccion), y solo despues se crea la
- * preferencia de pago. Asi nunca se cobra por algo que la base de datos ya
- * rechazo.
+ * Ya no hay pasarela de pago: el cobro se coordina por Yape o efectivo y lo
+ * confirma un humano desde el panel. Aun asi el pedido se crea con
+ * `procesar_checkout()`, que valida el stock con las filas bloqueadas, lo
+ * descuenta y calcula el total con los precios reales dentro de una unica
+ * transaccion. Del carrito del navegador solo se aceptan *que* producto, *que*
+ * talla y *cuantas* unidades; el precio que traiga se descarta.
  *
- * Del carrito del navegador solo se aceptan *que* producto, *que* talla y
- * *cuantas* unidades; el precio que traiga se descarta.
+ * El pedido nace en estado 'pendiente'. Pasa a 'confirmado' cuando alguien
+ * verifica el yapeo en el panel, no automaticamente.
  */
 export async function procesarPedido(
   formData: FormData,
@@ -69,7 +66,7 @@ export async function procesarPedido(
 ): Promise<ResultadoPedido> {
   const cliente = validarCliente(formData);
   if (typeof cliente === "string") {
-    return { ok: false, error: cliente };
+    return { exito: false, error: cliente };
   }
 
   // La zona viaja en el formulario; el COSTO nunca. Si el cliente mandara el
@@ -77,11 +74,11 @@ export async function procesarPedido(
   // validar la zona y decide el precio por su cuenta.
   const zona = texto(formData, "zona_envio");
   if (!esZonaValida(zona)) {
-    return { ok: false, error: "Selecciona una zona de envío." };
+    return { exito: false, error: "Selecciona una zona de envío." };
   }
 
   if (!Array.isArray(carrito) || carrito.length === 0) {
-    return { ok: false, error: "Tu carrito está vacío." };
+    return { exito: false, error: "Tu carrito está vacío." };
   }
 
   const items = carrito.map((item) => ({
@@ -91,7 +88,7 @@ export async function procesarPedido(
   }));
 
   if (items.some((i) => !Number.isInteger(i.cantidad) || i.cantidad <= 0)) {
-    return { ok: false, error: "Alguna cantidad del carrito no es válida." };
+    return { exito: false, error: "Alguna cantidad del carrito no es válida." };
   }
 
   const supabase = await createClient();
@@ -113,114 +110,21 @@ export async function procesarPedido(
     // (falta de stock, producto retirado...). Cualquier otro codigo es un
     // fallo inesperado y no se expone.
     if (error.code === "P0001") {
-      return { ok: false, error: error.message };
+      return { exito: false, error: error.message };
     }
 
     return {
-      ok: false,
+      exito: false,
       error: "No pudimos registrar tu pedido. Inténtalo de nuevo.",
     };
   }
 
   if (!pedidoId) {
     return {
-      ok: false,
+      exito: false,
       error: "No pudimos registrar tu pedido. Inténtalo de nuevo.",
     };
   }
 
-  try {
-    const url = await crearPreferenciaDePago(pedidoId, cliente, items, zona);
-    return { ok: true, pedidoId, url };
-  } catch (e) {
-    // El pedido ya existe y el stock ya se descontó, pero nadie va a pagarlo.
-    // Se avisa con el número para poder rescatarlo o cancelarlo a mano.
-    console.error(
-      `[checkout] Pedido ${pedidoId} creado pero falló la preferencia de MP:`,
-      e,
-    );
-    return {
-      ok: false,
-      error: `Registramos tu pedido #${pedidoId.slice(0, 8).toUpperCase()} pero no pudimos abrir la pasarela de pago. Escríbenos con ese número.`,
-    };
-  }
-}
-
-/**
- * Crea la preferencia de Checkout Pro y devuelve su URL.
- *
- * Los titulos y precios se releen de `productos` (SELECT publico) porque
- * `procesar_checkout()` devuelve solo el id y las tablas de pedidos no son
- * legibles sin sesion de admin.
- */
-async function crearPreferenciaDePago(
-  pedidoId: string,
-  cliente: DatosCliente,
-  items: { producto_id: string; cantidad: number; talla: string | null }[],
-  zona: ZonaEnvio,
-): Promise<string> {
-  const supabase = await createClient();
-
-  const { data: productos } = await supabase
-    .from("productos")
-    .select("id, titulo, precio")
-    .in("id", [...new Set(items.map((i) => i.producto_id))]);
-
-  const porId = new Map((productos ?? []).map((p) => [p.id, p]));
-
-  const itemsMP = items.map((item, indice) => {
-    const producto = porId.get(item.producto_id);
-    return {
-      id: `${item.producto_id}-${indice}`,
-      title: `${producto?.titulo ?? "Producto"}${item.talla ? ` (Talla ${item.talla})` : ""}`,
-      quantity: item.cantidad,
-      unit_price: producto?.precio ?? 0,
-      currency_id: "PEN",
-    };
-  });
-
-  // El envío va como una línea más de la preferencia. Sin esto, Mercado Pago
-  // cobraría sólo los productos y el importe no cuadraría con `pedidos.total`,
-  // que sí lo incluye — y el webhook, que compara ambos, rechazaría el pago.
-  itemsMP.push({
-    id: `envio-${zona}`,
-    title: `Costo de Envío — ${ZONAS_ENVIO[zona].etiqueta}`,
-    quantity: 1,
-    unit_price: costoEnvio(zona),
-    currency_id: "PEN",
-  });
-
-  const preference = getPreferenceClient();
-
-  const respuesta = await preference.create({
-    body: {
-      items: itemsMP,
-      // Es el hilo que une el pago de MP con nuestro pedido: el webhook lo lee
-      // para saber qué fila de `pedidos` confirmar. Sin esto no hay forma de
-      // relacionarlos.
-      external_reference: pedidoId,
-      payer: {
-        name: cliente.nombre,
-        phone: { area_code: "51", number: cliente.telefono },
-      },
-      back_urls: {
-        success: `${SITIO}/?pago=exito&pedido=${pedidoId}`,
-        pending: `${SITIO}/?pago=pendiente&pedido=${pedidoId}`,
-        failure: `${SITIO}/carrito?pago=error`,
-      },
-      auto_return: "approved",
-      notification_url: `${SITIO}/api/webhooks/mp`,
-      statement_descriptor: "SIXTYNINE",
-    },
-  });
-
-  // `sandbox_init_point` es el entorno de pruebas; con credenciales de
-  // producción MP no lo devuelve, así que `init_point` es el que manda.
-  const url = respuesta.init_point ?? respuesta.sandbox_init_point;
-
-  if (!url) {
-    throw new Error("Mercado Pago no devolvió una URL de pago.");
-  }
-
-  return url;
+  return { exito: true, pedidoId };
 }
