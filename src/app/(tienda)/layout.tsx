@@ -86,6 +86,22 @@ export default function TiendaLayout({ children }: LayoutProps<"/">) {
                     Mi carrito
                   </Link>
                 </li>
+                <li>
+                  <Link
+                    href="/terminos"
+                    className="text-xs text-white/60 transition-colors hover:text-white"
+                  >
+                    Términos y condiciones
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    href="/devoluciones"
+                    className="text-xs text-white/60 transition-colors hover:text-white"
+                  >
+                    Cambios y devoluciones
+                  </Link>
+                </li>
               </ul>
             </div>
 

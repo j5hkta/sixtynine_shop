@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 /** `page.tsx` es Client Component y no puede exportar `metadata`. */
 export const metadata: Metadata = {
-  title: "Checkout | Sixty Nine Skate & Apparel",
+  title: "Checkout",
   description: "Completa tus datos para cerrar el pedido por WhatsApp.",
   robots: { index: false, follow: false },
 };

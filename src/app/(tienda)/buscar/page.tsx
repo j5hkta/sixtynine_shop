@@ -5,7 +5,7 @@ import ProductCard from "@/components/tienda/ProductCard";
 import { createAnonClient } from "@/lib/supabase/anon";
 
 export const metadata = {
-  title: "Buscar | Sixty Nine Skate & Apparel",
+  title: "Buscar",
   robots: { index: false, follow: true },
 };
 

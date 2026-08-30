@@ -5,7 +5,7 @@ import type { Metadata } from "next";
  * Client Component y los Client Components no pueden exportar `metadata`.
  */
 export const metadata: Metadata = {
-  title: "Carrito | Sixty Nine Skate & Apparel",
+  title: "Carrito",
   description: "Revisa los artículos de tu carrito antes de pagar.",
   robots: { index: false, follow: false },
 };

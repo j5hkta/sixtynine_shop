@@ -15,7 +15,7 @@ import {
 import { createAnonClient } from "@/lib/supabase/anon";
 
 export const metadata = {
-  title: "Pedido reservado | Sixty Nine Skate & Apparel",
+  title: "Pedido reservado",
   robots: { index: false, follow: false },
 };
 

@@ -84,7 +84,7 @@ export async function generateMetadata({
   if (!producto) return { title: "Producto no encontrado" };
 
   return {
-    title: `${producto.titulo} | Sixty Nine`,
+    title: producto.titulo,
     description: producto.descripcion ?? undefined,
   };
 }

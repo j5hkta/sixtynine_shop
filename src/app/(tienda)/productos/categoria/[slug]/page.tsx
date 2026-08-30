@@ -38,7 +38,7 @@ export async function generateMetadata({
   if (!categoria) return { title: "Categoría no encontrada" };
 
   return {
-    title: `${categoria} | Sixty Nine Skate & Apparel`,
+    title: categoria,
     description: `${categoria} en el catálogo de Sixty Nine Skate & Apparel.`,
   };
 }

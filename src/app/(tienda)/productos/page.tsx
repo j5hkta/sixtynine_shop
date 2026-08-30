@@ -14,7 +14,7 @@ import { createAnonClient } from "@/lib/supabase/anon";
 export const revalidate = 60;
 
 export const metadata = {
-  title: "Catálogo | Sixty Nine Skate & Apparel",
+  title: "Catálogo",
   description:
     "Todo el catálogo de Sixty Nine: tablas, ruedas, trucks, zapatillas y ropa.",
 };
