@@ -41,13 +41,13 @@ export default function Navbar() {
     <header className="sticky top-0 z-50">
       {/* Franja 1: marca, buscador y carrito */}
       <div className="bg-black">
-        <div className="mx-auto flex h-20 max-w-7xl items-center gap-4 px-4 sm:gap-8 sm:px-6">
+        <div className="mx-auto flex h-14 max-w-7xl items-center gap-3 px-3 md:h-20 md:gap-8 md:px-6">
           <Link href="/" aria-label="Sixty Nine — Inicio" className="shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/logo.png"
               alt="Sixty Nine"
-              className="h-12 object-contain"
+              className="h-7 object-contain md:h-10"
             />
           </Link>
 
@@ -56,13 +56,13 @@ export default function Navbar() {
             method="get"
             onSubmit={buscar}
             role="search"
-            className="relative ml-auto w-full max-w-xs sm:ml-0 sm:max-w-sm"
+            className="relative ml-auto w-full max-w-[10rem] sm:max-w-xs md:ml-0 md:max-w-sm"
           >
             <label htmlFor="buscador" className="sr-only">
               Buscar productos
             </label>
             <Search
-              className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-neutral-500"
+              className="pointer-events-none absolute top-1/2 left-2.5 h-4 w-4 -translate-y-1/2 text-neutral-500 md:left-3"
               aria-hidden
             />
             <input
@@ -72,7 +72,7 @@ export default function Navbar() {
               value={termino}
               onChange={(e) => setTermino(e.target.value)}
               placeholder="Buscar..."
-              className="w-full border border-neutral-400 bg-white py-2 pr-3 pl-9 text-sm text-black transition-colors placeholder:text-neutral-400 focus:border-white focus:outline-none"
+              className="h-9 w-full border border-neutral-400 bg-white pr-2 pl-8 text-sm text-black transition-colors placeholder:text-neutral-400 focus:border-white focus:outline-none md:h-10 md:pr-3 md:pl-9"
             />
           </form>
 
@@ -83,27 +83,33 @@ export default function Navbar() {
                 ? "Carrito de compras (vacío)"
                 : `Carrito de compras (${totalItems} ${totalItems === 1 ? "artículo" : "artículos"})`
             }
-            className="relative ml-auto flex shrink-0 items-center gap-2 text-white transition-opacity hover:opacity-70"
+            className="ml-auto flex shrink-0 items-center gap-2 p-1 text-white transition-opacity hover:opacity-70"
           >
-            <ShoppingBag className="h-5 w-5" aria-hidden />
-            <span className="hidden text-[11px] font-bold tracking-[0.2em] uppercase lg:block">
+            {/* El contador se ancla al icono, no al enlace: en móvil el texto
+                "Carrito" desaparece y, colgado del enlace, el badge acabaría
+                encima del buscador. */}
+            <span className="relative">
+              <ShoppingBag className="h-5 w-5" aria-hidden />
+              {totalItems > 0 && (
+                <span
+                  aria-hidden
+                  className="absolute -top-2 -right-2 flex h-4 min-w-4 items-center justify-center bg-white px-1 font-mono text-[10px] font-black text-black"
+                >
+                  {totalItems > 99 ? "99+" : totalItems}
+                </span>
+              )}
+            </span>
+
+            <span className="hidden text-[11px] font-bold tracking-[0.2em] uppercase md:block">
               Carrito
             </span>
-            {totalItems > 0 && (
-              <span
-                aria-hidden
-                className="absolute -top-2 -left-2 flex h-4 min-w-4 items-center justify-center bg-white px-1 font-mono text-[10px] font-black text-black"
-              >
-                {totalItems > 99 ? "99+" : totalItems}
-              </span>
-            )}
           </Link>
         </div>
       </div>
 
       {/* Franja 2: categorías */}
       <nav aria-label="Categorías" className="border-t border-white/15 bg-black">
-        <ul className="mx-auto flex max-w-7xl items-center gap-6 overflow-x-auto px-4 py-3 sm:px-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <ul className="mx-auto flex max-w-7xl items-center gap-5 overflow-x-auto overscroll-x-contain px-3 py-2.5 whitespace-nowrap [-webkit-overflow-scrolling:touch] [scrollbar-width:none] md:gap-6 md:px-6 md:py-3 [&::-webkit-scrollbar]:hidden">
           <li className="shrink-0">
             <Link
               href="/productos"

@@ -145,7 +145,7 @@ export default async function HomePage() {
         )}
 
         {ultimos.length > 0 && (
-          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="mt-8 grid grid-cols-2 gap-3 md:grid-cols-3 md:gap-4 lg:grid-cols-4">
             {ultimos.map((producto) => (
               <ProductCard key={producto.id} producto={producto} />
             ))}

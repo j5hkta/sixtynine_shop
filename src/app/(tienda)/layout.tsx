@@ -112,7 +112,7 @@ export default function TiendaLayout({ children }: LayoutProps<"/">) {
               <p className="mt-4 text-xs text-white/60">
                 Envíos a todo el Perú.
                 <br />
-                Pagos con Mercado Pago.
+                Pagos mediante Yape o Efectivo.
               </p>
             </div>
           </div>

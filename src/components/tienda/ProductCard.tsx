@@ -39,7 +39,7 @@ export default function ProductCard({ producto }: { producto: ProductoTarjeta })
           />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-neutral-300">
-            <ImageOff className="h-8 w-8" aria-hidden />
+            <ImageOff className="h-6 w-6 md:h-8 md:w-8" aria-hidden />
             <span className="text-[10px] font-bold tracking-widest uppercase">
               Sin imagen
             </span>
@@ -48,22 +48,22 @@ export default function ProductCard({ producto }: { producto: ProductoTarjeta })
       </div>
 
       {/* Datos */}
-      <div className="flex flex-1 flex-col gap-1.5 border-t border-neutral-200 p-4">
+      <div className="flex flex-1 flex-col gap-1 border-t border-neutral-200 p-2 md:gap-1.5 md:p-4">
         {producto.categoria && (
-          <p className="text-[10px] font-bold tracking-[0.2em] text-neutral-400 uppercase">
+          <p className="hidden text-[10px] font-bold tracking-[0.2em] text-neutral-400 uppercase md:block">
             {producto.categoria}
           </p>
         )}
 
-        <h3 className="line-clamp-2 text-sm font-semibold text-black">
+        <h3 className="line-clamp-2 text-xs leading-snug font-semibold text-black md:text-sm">
           {producto.titulo}
         </h3>
 
-        <p className="mt-auto pt-3 font-mono text-lg font-bold text-black">
+        <p className="mt-auto pt-2 font-mono text-sm font-bold text-black md:pt-3 md:text-base">
           {moneda.format(producto.precio)}
         </p>
 
-        <span className="text-[10px] font-bold tracking-[0.2em] text-neutral-400 uppercase transition-colors group-hover:text-black">
+        <span className="hidden text-[10px] font-bold tracking-[0.2em] text-neutral-400 uppercase transition-colors group-hover:text-black md:block">
           Ver más
         </span>
       </div>
