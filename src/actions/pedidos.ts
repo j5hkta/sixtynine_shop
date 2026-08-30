@@ -14,15 +14,21 @@ const LISTADO = "/admin/pedidos";
  * la lista antes de tocar la base de datos: un valor fuera de ella lo
  * rechazaría el CHECK de la tabla, pero con un error de Postgres en crudo.
  */
-export async function actualizarEstadoPedido(id: string, nuevoEstado: string) {
+export type ResultadoEstado = { ok: true } | { ok: false; error: string };
+
+export async function actualizarEstadoPedido(
+  id: string,
+  nuevoEstado: string,
+): Promise<ResultadoEstado> {
   if (!id) {
-    throw new Error("Falta el identificador del pedido.");
+    return { ok: false, error: "Falta el identificador del pedido." };
   }
 
   if (!esEstadoPedidoValido(nuevoEstado)) {
-    throw new Error(
-      `Estado inválido: debe ser ${ESTADOS_PEDIDO.join(", ")}.`,
-    );
+    return {
+      ok: false,
+      error: `Estado inválido: debe ser ${ESTADOS_PEDIDO.join(", ")}.`,
+    };
   }
 
   const supabase = await createClient();
@@ -39,14 +45,20 @@ export async function actualizarEstadoPedido(id: string, nuevoEstado: string) {
 
   if (error) {
     console.error("[pedidos] Error al actualizar el estado:", error);
-    throw new Error(`No se pudo actualizar el pedido: ${error.message}`);
+    return {
+      ok: false,
+      error: `No se pudo actualizar el pedido: ${error.message}`,
+    };
   }
 
   if (!data || data.length === 0) {
-    throw new Error(
-      "No se guardó el cambio: el pedido no existe o tu cuenta no tiene permisos.",
-    );
+    return {
+      ok: false,
+      error:
+        "No se guardó el cambio: el pedido no existe o tu cuenta no tiene permisos.",
+    };
   }
 
   revalidatePath(LISTADO);
+  return { ok: true };
 }

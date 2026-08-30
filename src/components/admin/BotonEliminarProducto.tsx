@@ -23,11 +23,10 @@ export default function BotonEliminarProducto({
 
     setError(null);
     startTransition(async () => {
-      try {
-        await eliminarProducto(id);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "No se pudo eliminar.");
-      }
+      // La accion devuelve el fallo como dato: un `throw` llegaria aqui como
+      // el error generico #441 de React, sin mensaje util.
+      const resultado = await eliminarProducto(id);
+      if (!resultado.ok) setError(resultado.error);
     });
   }
 

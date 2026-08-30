@@ -33,6 +33,39 @@ comment on function public.obtener_resumen_pedido(uuid) is
 revoke all on function public.obtener_resumen_pedido(uuid) from public;
 grant execute on function public.obtener_resumen_pedido(uuid) to anon, authenticated;
 
+-- -----------------------------------------------------------------------------
+-- obtener_items_pedido()
+--
+-- La pantalla de confirmacion reparte el cobro entre dos vendedores segun la
+-- categoria de cada articulo, asi que necesita las lineas del pedido. Igual
+-- que la funcion de arriba: solo producto, categoria, cantidad y precio.
+-- Ningun dato del comprador.
+-- -----------------------------------------------------------------------------
+create or replace function public.obtener_items_pedido(p_id uuid)
+returns table (
+  titulo          text,
+  categoria       text,
+  cantidad        integer,
+  precio_unitario numeric
+)
+language sql
+security definer
+set search_path = public
+stable
+as $items$
+  select pr.titulo, pr.categoria, i.cantidad, i.precio_unitario
+    from public.pedidos_items i
+    join public.productos pr on pr.id = i.producto_id
+   where i.pedido_id = p_id
+   order by pr.titulo;
+$items$;
+
+comment on function public.obtener_items_pedido(uuid) is
+  'Lineas de un pedido para repartir el cobro entre vendedores. No expone datos del cliente.';
+
+revoke all on function public.obtener_items_pedido(uuid) from public;
+grant execute on function public.obtener_items_pedido(uuid) to anon, authenticated;
+
 -- =============================================================================
 -- Verificacion
 -- =============================================================================

@@ -229,8 +229,22 @@ export async function actualizarProducto(formData: FormData) {
  * Baja de producto. Se invoca desde el listado con `bind`, de modo que el `id`
  * viaja en el closure del servidor y no en un campo manipulable del formulario.
  */
-export async function eliminarProducto(id: string) {
-  if (!id) return;
+export type ResultadoBorrado = { ok: true } | { ok: false; error: string };
+
+/**
+ * Baja de producto. Se invoca desde el listado con `bind`, de modo que el `id`
+ * viaja en el closure del servidor y no en un campo manipulable del formulario.
+ *
+ * Devuelve el fallo como DATO en vez de lanzarlo. Un `throw` desde una Server
+ * Action llega al navegador convertido en el error generico #441 de React: en
+ * produccion React borra el mensaje para no filtrar detalles del servidor, asi
+ * que el texto cuidadosamente escrito aqui nunca se veia. Como valor de
+ * retorno viaja intacto.
+ */
+export async function eliminarProducto(id: string): Promise<ResultadoBorrado> {
+  if (!id) {
+    return { ok: false, error: "Falta el identificador del producto." };
+  }
 
   const supabase = await createClient();
 
@@ -250,20 +264,24 @@ export async function eliminarProducto(id: string) {
     // 23503 = violacion de clave foranea. `pedidos_items.producto_id` usa
     // `on delete restrict` para no destruir el historial de pedidos.
     if (error.code === "23503") {
-      throw new Error(
-        "No se puede eliminar: el producto aparece en pedidos ya registrados. " +
-          "Cámbialo a estado 'borrador' para retirarlo de la tienda.",
-      );
+      return {
+        ok: false,
+        error:
+          "No se puede eliminar: el producto aparece en pedidos ya registrados. " +
+          "Cambialo a estado 'borrador' para retirarlo de la tienda.",
+      };
     }
 
-    throw new Error(`No se pudo eliminar el producto: ${error.message}`);
+    return { ok: false, error: `No se pudo eliminar el producto: ${error.message}` };
   }
 
   if (!data || data.length === 0) {
-    throw new Error(
-      "No se eliminó el producto: no existe o tu cuenta no tiene permisos.",
-    );
+    return {
+      ok: false,
+      error: "No se elimino el producto: no existe o tu cuenta no tiene permisos.",
+    };
   }
 
   revalidatePath(LISTADO);
+  return { ok: true };
 }

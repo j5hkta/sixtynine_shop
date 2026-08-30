@@ -29,11 +29,11 @@ export default function SelectorEstadoPedido({
     setError(null);
 
     iniciarCambio(async () => {
-      try {
-        await actualizarEstadoPedido(id, nuevo);
-      } catch (e) {
+      // Igual que en el borrado: el fallo llega como dato, no como excepcion.
+      const resultado = await actualizarEstadoPedido(id, nuevo);
+      if (!resultado.ok) {
         setValor(anterior);
-        setError(e instanceof Error ? e.message : "No se pudo actualizar.");
+        setError(resultado.error);
       }
     });
   }

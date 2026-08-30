@@ -229,6 +229,16 @@ export type Database = {
         Args: { p_id: string };
         Returns: { total: number; costo_envio: number; estado: string }[];
       };
+      /** Líneas del pedido, para repartir el cobro entre los dos vendedores. */
+      obtener_items_pedido: {
+        Args: { p_id: string };
+        Returns: {
+          titulo: string;
+          categoria: string | null;
+          cantidad: number;
+          precio_unitario: number;
+        }[];
+      };
       /**
        * Ver `supabase/rate_limit.sql`. `true` si la petición se permite.
        * Sólo ejecutable con la `service_role` key.
