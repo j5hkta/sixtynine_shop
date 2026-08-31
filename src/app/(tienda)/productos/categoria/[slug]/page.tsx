@@ -56,6 +56,8 @@ async function cargarCategoria(categoria: string) {
       .select("id, titulo, precio, precio_original, categoria, imagenes")
       .eq("categoria", categoria)
       .eq("estado", "activo")
+      // Los agotados salen del catálogo solos, sin que nadie los toque.
+      .gt("stock", 0)
       .order("creado_en", { ascending: false });
 
     if (error) throw error;

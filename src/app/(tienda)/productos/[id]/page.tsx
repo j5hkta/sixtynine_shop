@@ -162,10 +162,10 @@ export default async function ProductoDetallePage({
             {hayStock ? (
               <>
                 <PackageCheck className="h-4 w-4 text-black" aria-hidden />
-                <span className="text-neutral-600">
-                  En stock — {producto.stock}{" "}
-                  {producto.stock === 1 ? "unidad" : "unidades"}
-                </span>
+                {/* Sin la cifra: enseñar "quedan 2" invita a esperar a que
+                    bajen de precio, y enseñar "quedan 40" quita urgencia. El
+                    dato exacto sólo lo necesita el panel. */}
+                <span className="text-neutral-600">En stock</span>
               </>
             ) : (
               <>
@@ -188,7 +188,7 @@ export default async function ProductoDetallePage({
               precio={producto.precio}
               imagen={imagenes[0] ?? null}
               tallas={tallas}
-              stock={hayStock ? producto.stock : 0}
+              disponible={hayStock}
             />
           </div>
         </div>

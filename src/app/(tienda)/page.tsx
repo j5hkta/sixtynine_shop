@@ -74,12 +74,14 @@ async function cargarPortada(): Promise<DatosPortada> {
         .from("productos")
         .select(`${CAMPOS_TARJETA}, seccion_portada`)
         .eq("estado", "activo")
+        .gt("stock", 0)
         .neq("seccion_portada", "ninguna")
         .order("creado_en", { ascending: false }),
       supabase
         .from("productos")
         .select(CAMPOS_TARJETA)
         .eq("estado", "activo")
+        .gt("stock", 0)
         .order("creado_en", { ascending: false })
         .limit(MAXIMO_POR_SECCION),
       supabase

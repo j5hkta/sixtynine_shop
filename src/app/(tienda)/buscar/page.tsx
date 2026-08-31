@@ -33,6 +33,8 @@ async function buscarProductos(termino: string) {
       .from("productos")
       .select("id, titulo, precio, precio_original, categoria, imagenes")
       .eq("estado", "activo")
+      // Los agotados salen de los resultados solos, sin que nadie los toque.
+      .gt("stock", 0)
       .ilike("titulo", `%${termino}%`)
       .order("creado_en", { ascending: false })
       .limit(MAX_RESULTADOS);

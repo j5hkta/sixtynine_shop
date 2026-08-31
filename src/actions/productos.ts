@@ -46,12 +46,21 @@ function volverConError(destino: string, mensaje: string): never {
 }
 
 /**
- * La portada se arma a partir de `seccion_portada`, asi que crear o editar un
- * producto puede cambiarla. Sin esto, la franja nueva tardaria hasta 60 s en
- * aparecer y pareceria que el panel no guardo nada.
+ * Invalida todas las vistas publicas que dependen del producto.
+ *
+ * Son cuatro y no una porque cualquiera de ellas puede cambiar al guardar: la
+ * portada se arma con `seccion_portada`, y el catalogo, las categorias y la
+ * ficha filtran por `stock > 0`, asi que reponer inventario tiene que devolver
+ * el producto a la tienda en el acto. Sin esto tardaria hasta 60 s y pareceria
+ * que el panel no guardo nada.
+ *
+ * `/buscar` no aparece: se renderiza bajo demanda, nunca se cachea.
  */
-function refrescarPortada() {
+function refrescarTiendaPublica() {
   revalidatePath("/", "page");
+  revalidatePath("/productos");
+  revalidatePath("/productos/[id]", "page");
+  revalidatePath("/productos/categoria/[slug]", "page");
 }
 
 // -----------------------------------------------------------------------------
@@ -204,7 +213,7 @@ export async function crearProducto(formData: FormData) {
   }
 
   revalidatePath(LISTADO);
-  refrescarPortada();
+  refrescarTiendaPublica();
   redirect(LISTADO);
 }
 
@@ -277,7 +286,7 @@ export async function actualizarProducto(formData: FormData) {
 
   revalidatePath(LISTADO);
   revalidatePath(destinoError);
-  refrescarPortada();
+  refrescarTiendaPublica();
   redirect(LISTADO);
 }
 
@@ -343,5 +352,6 @@ export async function eliminarProducto(id: string): Promise<ResultadoBorrado> {
   }
 
   revalidatePath(LISTADO);
+  refrescarTiendaPublica();
   return { ok: true };
 }

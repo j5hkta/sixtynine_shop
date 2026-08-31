@@ -12,8 +12,13 @@ type AccionesProductoProps = {
   /** Portada del producto; se guarda en la línea del carrito. */
   imagen: string | null;
   tallas: string[];
-  /** 0 deshabilita la compra. */
-  stock: number;
+  /**
+   * Si se puede comprar. Booleano y no la cifra de stock a propósito: todo lo
+   * que reciba un Client Component viaja al navegador dentro del HTML, así que
+   * pasar `stock` dejaría el inventario exacto a la vista de cualquiera que
+   * mire el código fuente, justo lo que se quiere ocultar.
+   */
+  disponible: boolean;
 };
 
 export default function AccionesProducto({
@@ -22,7 +27,7 @@ export default function AccionesProducto({
   precio,
   imagen,
   tallas,
-  stock,
+  disponible,
 }: AccionesProductoProps) {
   const agregarItem = useCarrito((estado) => estado.agregarItem);
 
@@ -39,7 +44,7 @@ export default function AccionesProducto({
     };
   }, []);
 
-  const sinStock = stock <= 0;
+  const sinStock = !disponible;
 
   function anadirAlCarrito() {
     if (tallas.length > 0 && !talla) {
@@ -110,7 +115,7 @@ export default function AccionesProducto({
         className="flex w-full items-center justify-center gap-2 bg-black py-4 text-sm font-black tracking-[0.15em] text-white uppercase transition-colors hover:opacity-80 disabled:cursor-not-allowed disabled:bg-neutral-200 disabled:text-neutral-400"
       >
         {sinStock ? (
-          "Sin stock"
+          "Agotado"
         ) : confirmado ? (
           <>
             <Check className="h-4 w-4" aria-hidden />
