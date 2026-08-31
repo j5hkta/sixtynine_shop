@@ -1,6 +1,7 @@
 import Link from "next/link";
 import NextTopLoader from "nextjs-toploader";
 
+import BotonWhatsApp from "@/components/BotonWhatsApp";
 import Navbar from "@/components/tienda/Navbar";
 import { CATEGORIAS, rutaDeCategoria } from "@/lib/categorias";
 
@@ -137,6 +138,11 @@ export default function TiendaLayout({ children }: LayoutProps<"/">) {
           </div>
         </div>
       </footer>
+
+      {/* Fuera del <main> y del <footer>: es un elemento fijo que acompaña a
+          todas las rutas públicas, no contenido de ninguna de ellas. Sólo vive
+          en este layout, así que el panel de administración no lo hereda. */}
+      <BotonWhatsApp />
     </div>
   );
 }
