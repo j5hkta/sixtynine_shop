@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import PaginaLegal, { Lista, Seccion } from "@/components/tienda/PaginaLegal";
 import { moneda } from "@/lib/formato";
-import { ZONAS_ENVIO } from "@/lib/envio";
+import { AGENCIAS, UMBRAL_ENVIO_GRATIS } from "@/lib/envio";
 
 export const metadata = {
   title: "Términos y Condiciones",
@@ -14,7 +14,7 @@ export const metadata = {
  * TEXTO DE EJEMPLO.
  *
  * Describe con fidelidad cómo funciona la tienda hoy (pago manual por Yape,
- * reserva de 24 h, tarifas de envío), pero no lo ha revisado nadie con
+ * reserva de 1 h, envío por agencia), pero no lo ha revisado nadie con
  * criterio legal. Antes de operar de verdad conviene que lo lea un abogado y
  * que se completen los datos de la empresa (razón social y RUC).
  */
@@ -43,8 +43,8 @@ export default function TerminosPage() {
         </p>
         <p>
           Si un producto queda sin stock después de que hayas hecho el pedido,
-          te contactaremos para ofrecerte un cambio o la devolución íntegra de
-          lo pagado.
+          te contactaremos para ofrecerte otro artículo de valor equivalente o
+          un vale de compra.
         </p>
       </Seccion>
 
@@ -61,8 +61,9 @@ export default function TerminosPage() {
               ya registrados.
             </>,
             <>
-              El costo de envío se muestra por separado antes de confirmar y se
-              suma al total.
+              El total no incluye el flete de la agencia: ese costo se abona al
+              recoger el paquete, salvo que el pedido supere el umbral de envío
+              gratis.
             </>,
           ]}
         />
@@ -76,11 +77,12 @@ export default function TerminosPage() {
         <p>
           Al confirmar el pedido reservamos las unidades y te mostramos el monto
           exacto y el número al que debes yapear. Si tu pedido incluye artículos
-          de skate y de ropa, verás <strong>dos montos y dos números</strong>,
-          uno por cada responsable; ambos deben pagarse para procesar el envío.
+          de skate y de ropa, te mostramos{" "}
+          <strong>un único monto y dos números</strong>: puedes yaparlo
+          completo a cualquiera de los dos.
         </p>
         <p>
-          <strong>La reserva dura 24 horas.</strong> Pasado ese plazo sin
+          <strong>La reserva dura 1 hora.</strong> Pasado ese plazo sin
           confirmación de pago, el pedido se cancela automáticamente y las
           unidades vuelven al catálogo.
         </p>
@@ -91,35 +93,63 @@ export default function TerminosPage() {
       </Seccion>
 
       <Seccion numero={5} titulo="Envíos">
-        <p>Las tarifas vigentes son:</p>
+        <p>
+          Enviamos <strong>exclusivamente por agencia</strong> a todo el Perú.
+          No hacemos entregas a domicilio. Al comprar eliges entre{" "}
+          {AGENCIAS.shalom.etiqueta} y {AGENCIAS.olva.etiqueta}, e indicas la
+          sede donde recogerás el paquete.
+        </p>
+
         <Lista
           items={[
             <>
-              <strong>{ZONAS_ENVIO.lima.etiqueta}:</strong>{" "}
-              {moneda.format(ZONAS_ENVIO.lima.costo)}
+              <strong>
+                Pedidos mayores a {moneda.format(UMBRAL_ENVIO_GRATIS)}:
+              </strong>{" "}
+              el flete lo asume la tienda.
             </>,
             <>
-              <strong>{ZONAS_ENVIO.provincia.etiqueta}:</strong>{" "}
-              {moneda.format(ZONAS_ENVIO.provincia.costo)}
+              <strong>
+                Pedidos de {moneda.format(UMBRAL_ENVIO_GRATIS)} o menos:
+              </strong>{" "}
+              flete con pago en destino, es decir, se abona en la agencia al
+              recoger.
             </>,
           ]}
         />
+
         <p>
-          Los plazos de entrega se coordinan por WhatsApp una vez confirmado el
-          pago y dependen del destino y del servicio de mensajería. La dirección
-          que registres es la que usaremos: revísala antes de confirmar, porque
-          un reenvío por dirección incorrecta genera un costo adicional.
+          El importe del flete lo fija la agencia según destino y peso, por eso
+          no se cobra en la web: el total que pagas cubre sólo los productos.
+          Despachamos entre 24 y 48 horas hábiles tras confirmar el pago, y
+          cargamos el número de seguimiento y la clave de recojo en{" "}
+          <Link
+            href="/seguimiento"
+            className="font-bold text-black underline underline-offset-4"
+          >
+            seguimiento
+          </Link>
+          .
         </p>
       </Seccion>
 
-      <Seccion numero={6} titulo="Cambios y devoluciones">
+      <Seccion numero={6} titulo="Ventas finales">
         <p>
-          Las condiciones de cambio y devolución se detallan en nuestra{" "}
+          <strong>
+            No aceptamos devoluciones, cambios ni reembolsos de dinero.
+          </strong>{" "}
+          Todas las ventas son finales. Revisa tu talla, tu modelo y las fotos
+          antes de confirmar, y escríbenos por WhatsApp si tienes cualquier duda
+          previa a la compra.
+        </p>
+        <p>
+          Los detalles y las excepciones por daño en tránsito están en la
+          página de{" "}
           <Link
             href="/devoluciones"
             className="font-bold text-black underline underline-offset-4"
           >
-            política de cambios y devoluciones
+            envíos y devoluciones
           </Link>
           .
         </p>
@@ -127,10 +157,10 @@ export default function TerminosPage() {
 
       <Seccion numero={7} titulo="Datos personales">
         <p>
-          Para procesar tu pedido recogemos nombre, DNI, teléfono y dirección de
-          envío. Los usamos únicamente para preparar, enviar y coordinar tu
-          compra, y no los compartimos con terceros salvo con la empresa de
-          mensajería encargada de la entrega.
+          Para procesar tu pedido recogemos nombre, DNI, teléfono, ciudad o
+          distrito y la sede de agencia elegida. Los usamos únicamente para
+          preparar y despachar tu compra, y no los compartimos con terceros
+          salvo con la agencia encargada de la entrega.
         </p>
         <p>
           Puedes solicitar la corrección o eliminación de tus datos escribiendo
@@ -154,7 +184,7 @@ export default function TerminosPage() {
             href="/devoluciones"
             className="font-bold text-black underline underline-offset-4"
           >
-            página de devoluciones
+            página de envíos
           </Link>
           .
         </p>

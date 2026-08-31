@@ -12,7 +12,13 @@ import {
 } from "lucide-react";
 
 import { procesarPedido } from "@/actions/checkout";
-import { costoEnvio, esZonaValida, ZONAS, ZONAS_ENVIO, type ZonaEnvio } from "@/lib/envio";
+import {
+  AGENCIAS,
+  CLAVES_AGENCIA,
+  esAgenciaValida,
+  textoEnvio,
+  type Agencia,
+} from "@/lib/envio";
 import { moneda } from "@/lib/formato";
 import { useCarrito, useHidratado, useTotalPrecio } from "@/store/carrito";
 
@@ -35,15 +41,16 @@ export default function CheckoutPage() {
 
   const [dni, setDni] = useState("");
   const [nombre, setNombre] = useState("");
-  const [zona, setZona] = useState<ZonaEnvio | "">("");
+  const [agencia, setAgencia] = useState<Agencia | "">("");
   const [consultandoDni, setConsultandoDni] = useState(false);
 
   // Evita repetir la consulta del mismo DNI si el usuario borra y reescribe el
   // último dígito, que dispararía el fetch en cada pulsación.
   const ultimoDniConsultado = useRef<string | null>(null);
 
-  const envio = zona ? costoEnvio(zona) : 0;
-  const total = subtotal + envio;
+  // El flete no entra en el total: se paga en la agencia, o lo asume la tienda
+  // si el pedido supera el umbral.
+  const total = subtotal;
 
   function alCambiarDni(valor: string) {
     const soloDigitos = valor.replace(/\D/g, "").slice(0, 8);
@@ -75,8 +82,8 @@ export default function CheckoutPage() {
   function handleSubmit(evento: React.FormEvent<HTMLFormElement>) {
     evento.preventDefault();
 
-    if (!esZonaValida(zona)) {
-      setError("Selecciona una zona de envío.");
+    if (!esAgenciaValida(agencia)) {
+      setError("Selecciona la agencia por la que quieres recibir tu pedido.");
       return;
     }
 
@@ -247,46 +254,77 @@ export default function CheckoutPage() {
             </p>
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="zona_envio" className={labelClase}>
-              Zona de Envío
-            </label>
-            <select
-              id="zona_envio"
-              name="zona_envio"
-              required
-              value={zona}
-              onChange={(e) => {
-                setZona(e.target.value as ZonaEnvio | "");
-                setError(null);
-              }}
-              className={inputClase}
-            >
-              <option value="">Selecciona una zona...</option>
-              {ZONAS.map((clave) => (
-                <option key={clave} value={clave}>
-                  {ZONAS_ENVIO[clave].etiqueta} (
-                  {moneda.format(ZONAS_ENVIO[clave].costo)})
-                </option>
+          <fieldset className="space-y-2">
+            <legend className={labelClase}>Agencia de envío</legend>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              {CLAVES_AGENCIA.map((clave) => (
+                <label
+                  key={clave}
+                  className={`flex cursor-pointer items-center gap-3 border px-4 py-3 text-sm transition-colors ${
+                    agencia === clave
+                      ? "border-black bg-black text-white"
+                      : "border-neutral-400 bg-white text-black hover:border-black"
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="agencia"
+                    value={clave}
+                    checked={agencia === clave}
+                    onChange={() => {
+                      setAgencia(clave);
+                      setError(null);
+                    }}
+                    className="h-4 w-4 accent-black"
+                  />
+                  <span className="font-bold">{AGENCIAS[clave].etiqueta}</span>
+                </label>
               ))}
-            </select>
+            </div>
+
+            <p className={ayudaClase}>
+              Enviamos únicamente por agencia. Recoges tu pedido en el local que
+              elijas.
+            </p>
+          </fieldset>
+
+          <div className="space-y-2">
+            <label htmlFor="sede_agencia" className={labelClase}>
+              Sede de la Agencia
+            </label>
+            <input
+              id="sede_agencia"
+              name="sede_agencia"
+              type="text"
+              required
+              maxLength={120}
+              placeholder="Ej: Shalom Av. Aviación 2534, La Victoria"
+              aria-describedby="sede-ayuda"
+              className={inputClase}
+            />
+            <p id="sede-ayuda" className={ayudaClase}>
+              El local exacto donde vas a recogerlo. Si no lo sabes, escribe el
+              distrito y lo coordinamos por WhatsApp.
+            </p>
           </div>
 
           <div className="space-y-2">
             <label htmlFor="direccion" className={labelClase}>
-              Dirección de Envío
+              Ciudad / Distrito
             </label>
-            <textarea
+            <input
               id="direccion"
               name="direccion"
-              rows={3}
+              type="text"
               required
-              autoComplete="street-address"
-              placeholder="Av. Larco 123, Dpto. 401, Miraflores, Lima"
-              className={`${inputClase} resize-y`}
+              maxLength={80}
+              autoComplete="address-level2"
+              placeholder="Ej: Miraflores, Lima"
+              className={inputClase}
             />
             <p className={ayudaClase}>
-              Incluye distrito y alguna referencia para el repartidor.
+              A dónde va el paquete. La dirección exacta la pone la agencia.
             </p>
           </div>
 
@@ -348,20 +386,14 @@ export default function CheckoutPage() {
             <div className="flex items-baseline justify-between gap-4">
               <dt className="text-neutral-600">
                 Envío
-                {zona && (
+                {agencia && (
                   <span className="block text-xs text-neutral-400">
-                    {ZONAS_ENVIO[zona].etiqueta}
+                    {AGENCIAS[agencia].etiqueta}
                   </span>
                 )}
               </dt>
-              <dd className="font-mono text-black">
-                {zona ? (
-                  moneda.format(envio)
-                ) : (
-                  <span className="font-sans text-xs text-neutral-400">
-                    Elige una zona
-                  </span>
-                )}
+              <dd className="text-right text-xs font-bold text-black">
+                {textoEnvio(subtotal)}
               </dd>
             </div>
           </dl>
@@ -377,7 +409,7 @@ export default function CheckoutPage() {
 
           <p className="mt-3 text-xs leading-relaxed text-neutral-400">
             Los precios y el stock se vuelven a verificar contra el catálogo al
-            confirmar.
+            confirmar. El total no incluye el flete de la agencia.
           </p>
         </aside>
       </div>

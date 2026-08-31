@@ -8,15 +8,15 @@
 -- paga, esas unidades quedan retenidas para siempre y desaparecen del catalogo
 -- sin haberse vendido. Esta funcion las devuelve.
 --
--- VENTANA: 24 horas.
--- El cobro es manual (Yape o efectivo) y se coordina por WhatsApp, asi que hay
--- que dar margen para que alguien vea el mensaje, yapee y mande la captura.
--- Con una pasarela de tarjeta bastarian 30 minutos; con una persona al otro
--- lado, no.
+-- VENTANA: 1 hora.
+-- Es una medida antispam: quien de verdad quiere el producto yapea en minutos,
+-- y una ventana corta impide que alguien reserve stock a granel sin intencion
+-- de pagar. El precio a pagar es que un comprador lento pierde la reserva, asi
+-- que la pantalla de confirmacion se lo advierte de forma bien visible.
 -- =============================================================================
 
 create or replace function public.liberar_stock_vencido(
-  p_horas integer default 24
+  p_horas integer default 1
 )
 returns integer
 language plpgsql
@@ -82,8 +82,8 @@ grant execute on function public.liberar_stock_vencido(integer) to service_role;
 --
 --   select cron.schedule(
 --     'liberar-stock-vencido',
---     '0 * * * *',                                   -- cada hora en punto
---     $$select public.liberar_stock_vencido(24)$$
+--     '*/10 * * * *',                                -- cada 10 minutos
+--     $$select public.liberar_stock_vencido(1)$$
 --   );
 --
 -- Para comprobar que quedo programado:
@@ -103,5 +103,5 @@ grant execute on function public.liberar_stock_vencido(integer) to service_role;
 -- --   select public.liberar_stock_vencido(0);
 --
 -- -- Ejecucion normal:
--- select public.liberar_stock_vencido(24);
+-- select public.liberar_stock_vencido(1);
 -- =============================================================================

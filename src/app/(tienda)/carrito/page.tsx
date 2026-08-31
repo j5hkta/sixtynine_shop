@@ -10,6 +10,7 @@ import {
   Trash2,
 } from "lucide-react";
 
+import { textoEnvio } from "@/lib/envio";
 import { moneda } from "@/lib/formato";
 import {
   useCarrito,
@@ -108,7 +109,9 @@ export default function CarritoPage() {
             </div>
             <div className="flex items-baseline justify-between gap-4">
               <dt className="text-neutral-600">Envío</dt>
-              <dd className="text-xs text-neutral-400">Por calcular</dd>
+              <dd className="text-right text-xs font-bold text-black">
+                {textoEnvio(subtotal)}
+              </dd>
             </div>
           </dl>
 
@@ -122,7 +125,8 @@ export default function CarritoPage() {
           </div>
 
           <p className="mt-3 text-xs leading-relaxed text-neutral-400">
-            El envío se calculará en el siguiente paso.
+            Enviamos por agencia (Shalom u Olva). El flete no entra en este
+            total: se paga al recoger, salvo pedidos sobre S/ 250.
           </p>
 
           <Link

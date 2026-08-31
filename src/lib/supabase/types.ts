@@ -114,6 +114,10 @@ export type Database = {
           total: number;
           costo_envio: number;
           zona_envio: string | null;
+          agencia: string | null;
+          sede_agencia: string | null;
+          tracking_numero: string | null;
+          tracking_clave: string | null;
           estado: EstadoPedido;
         };
         Insert: {
@@ -126,6 +130,10 @@ export type Database = {
           total: number;
           costo_envio?: number;
           zona_envio?: string | null;
+          agencia?: string | null;
+          sede_agencia?: string | null;
+          tracking_numero?: string | null;
+          tracking_clave?: string | null;
           estado?: EstadoPedido;
         };
         Update: {
@@ -138,6 +146,10 @@ export type Database = {
           total?: number;
           costo_envio?: number;
           zona_envio?: string | null;
+          agencia?: string | null;
+          sede_agencia?: string | null;
+          tracking_numero?: string | null;
+          tracking_clave?: string | null;
           estado?: EstadoPedido;
         };
         Relationships: [];
@@ -217,7 +229,8 @@ export type Database = {
           p_cliente_dni: string;
           p_direccion_envio: string;
           p_items: Json;
-          p_zona_envio: string;
+          p_agencia: string;
+          p_sede_agencia: string;
         };
         Returns: string;
       };
@@ -227,7 +240,16 @@ export type Database = {
        */
       obtener_resumen_pedido: {
         Args: { p_id: string };
-        Returns: { total: number; costo_envio: number; estado: string }[];
+        Returns: {
+          total: number;
+          costo_envio: number;
+          estado: string;
+          creado_en: string;
+          agencia: string | null;
+          sede_agencia: string | null;
+          tracking_numero: string | null;
+          tracking_clave: string | null;
+        }[];
       };
       /** Líneas del pedido, para repartir el cobro entre los dos vendedores. */
       obtener_items_pedido: {

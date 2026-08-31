@@ -1,6 +1,6 @@
 "use server";
 
-import { esZonaValida } from "@/lib/envio";
+import { esAgenciaValida } from "@/lib/envio";
 import { createClient } from "@/lib/supabase/server";
 import type { ItemCarrito } from "@/store/carrito";
 
@@ -40,8 +40,10 @@ function validarCliente(formData: FormData): DatosCliente | string {
   if (!/^9\d{8}$/.test(telefono)) {
     return "El teléfono debe ser un celular peruano de 9 dígitos que empiece en 9.";
   }
-  if (direccion.length < 10) {
-    return "Ingresa una dirección de envío completa.";
+  // Solo ciudad o distrito: la direccion exacta la pone la agencia, asi que
+  // "Lima" es una respuesta perfectamente valida.
+  if (direccion.length < 3) {
+    return "Ingresa tu ciudad o distrito.";
   }
 
   return { nombre, dni, telefono, direccion };
@@ -59,6 +61,9 @@ function validarCliente(formData: FormData): DatosCliente | string {
  *
  * El pedido nace en estado 'pendiente'. Pasa a 'confirmado' cuando alguien
  * verifica el yapeo en el panel, no automaticamente.
+ *
+ * El flete no se cobra aqui: el paquete viaja a la agencia elegida y se paga
+ * al recogerlo, o lo asume la tienda si el pedido supera el umbral.
  */
 export async function procesarPedido(
   formData: FormData,
@@ -69,12 +74,17 @@ export async function procesarPedido(
     return { exito: false, error: cliente };
   }
 
-  // La zona viaja en el formulario; el COSTO nunca. Si el cliente mandara el
-  // importe podria pedirse un envio de S/ 0.00. `procesar_checkout()` vuelve a
-  // validar la zona y decide el precio por su cuenta.
-  const zona = texto(formData, "zona_envio");
-  if (!esZonaValida(zona)) {
-    return { exito: false, error: "Selecciona una zona de envío." };
+  const agencia = texto(formData, "agencia");
+  if (!esAgenciaValida(agencia)) {
+    return { exito: false, error: "Selecciona una agencia de envío." };
+  }
+
+  const sede = texto(formData, "sede_agencia");
+  if (sede.length < 3) {
+    return {
+      exito: false,
+      error: "Indica la sede de la agencia donde recogerás el pedido.",
+    };
   }
 
   if (!Array.isArray(carrito) || carrito.length === 0) {
@@ -99,7 +109,8 @@ export async function procesarPedido(
     p_cliente_dni: cliente.dni,
     p_direccion_envio: cliente.direccion,
     p_items: items,
-    p_zona_envio: zona,
+    p_agencia: agencia,
+    p_sede_agencia: sede,
   });
 
   if (error) {

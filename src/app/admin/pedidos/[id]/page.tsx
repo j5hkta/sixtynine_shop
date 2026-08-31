@@ -11,6 +11,7 @@ import {
   User,
 } from "lucide-react";
 
+import FormularioEnvio from "@/components/admin/FormularioEnvio";
 import SelectorEstadoPedido from "@/components/admin/SelectorEstadoPedido";
 import { fecha, moneda } from "@/lib/formato";
 import { createClient } from "@/lib/supabase/server";
@@ -149,6 +150,13 @@ export default async function DetallePedidoPage({
               <SelectorEstadoPedido id={pedido.id} estado={pedido.estado} />
             </div>
           </div>
+
+          <FormularioEnvio
+            pedidoId={pedido.id}
+            trackingNumero={pedido.tracking_numero}
+            trackingClave={pedido.tracking_clave}
+            yaEnviado={pedido.estado === "enviado"}
+          />
         </section>
 
         {/* Bloque 2: artículos */}

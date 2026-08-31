@@ -88,6 +88,14 @@ export default function TiendaLayout({ children }: LayoutProps<"/">) {
                 </li>
                 <li>
                   <Link
+                    href="/seguimiento"
+                    className="text-xs text-white/60 transition-colors hover:text-white"
+                  >
+                    Seguir mi pedido
+                  </Link>
+                </li>
+                <li>
+                  <Link
                     href="/terminos"
                     className="text-xs text-white/60 transition-colors hover:text-white"
                   >
@@ -99,7 +107,7 @@ export default function TiendaLayout({ children }: LayoutProps<"/">) {
                     href="/devoluciones"
                     className="text-xs text-white/60 transition-colors hover:text-white"
                   >
-                    Cambios y devoluciones
+                    Envíos y devoluciones
                   </Link>
                 </li>
               </ul>
@@ -113,6 +121,8 @@ export default function TiendaLayout({ children }: LayoutProps<"/">) {
                 Envíos a todo el Perú.
                 <br />
                 Pagos mediante Yape o Efectivo.
+                <br />
+                Envíos por Shalom u Olva.
               </p>
             </div>
           </div>

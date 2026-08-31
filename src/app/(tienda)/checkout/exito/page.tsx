@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { AlertTriangle, CheckCircle2, MessageCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, MessageCircle } from "lucide-react";
 
 import LimpiarCarrito from "@/components/tienda/LimpiarCarrito";
 import { moneda } from "@/lib/formato";
@@ -26,65 +26,23 @@ type LineaPedido = {
   precio_unitario: number;
 };
 
-/** Cuánto le toca cobrar a cada hermano. */
-type Reparto = {
-  vendedor: Vendedor;
-  /** Suma de producto, sin envío. */
-  subtotal: number;
-  /** Lo que hay que yapear: subtotal más el envío si le corresponde. */
-  aPagar: number;
-  llevaEnvio: boolean;
-  lineas: LineaPedido[];
-};
-
 /**
- * Reparte las líneas entre los dos vendedores y decide quién cobra el envío.
+ * Vendedores implicados en el pedido, en orden estable.
  *
- * El envío es uno solo y no se puede partir, así que se carga entero al
- * vendedor con mayor subtotal. Lo importante es que las dos cifras sumen
- * exactamente el total del pedido: si no cuadraran, el comprador yapearía de
- * menos y nadie sabría por qué.
+ * Ya NO se reparte el importe: el comprador yapea el total a cualquiera de los
+ * dos y ellos se cuadran entre sí. Partir la cifra obligaba a hacer dos
+ * transferencias exactas y era la parte más frágil del flujo — un céntimo mal
+ * repartido y el pedido quedaba a medio pagar.
  */
-function repartir(lineas: LineaPedido[], costoEnvio: number): Reparto[] {
-  const cubos = new Map<Vendedor, LineaPedido[]>();
-
-  for (const linea of lineas) {
-    const vendedor = vendedorDeCategoria(linea.categoria);
-    cubos.set(vendedor, [...(cubos.get(vendedor) ?? []), linea]);
-  }
-
-  const partes: Reparto[] = [...cubos.entries()].map(([vendedor, suyas]) => ({
-    vendedor,
-    subtotal:
-      Math.round(
-        suyas.reduce((s, l) => s + l.precio_unitario * l.cantidad, 0) * 100,
-      ) / 100,
-    aPagar: 0,
-    llevaEnvio: false,
-    lineas: suyas,
-  }));
-
-  // Orden estable: primero el de mayor subtotal, que es quien carga el envío.
-  partes.sort((a, b) => b.subtotal - a.subtotal);
-
-  return partes.map((parte, indice) => {
-    const llevaEnvio = indice === 0;
-    return {
-      ...parte,
-      llevaEnvio,
-      aPagar:
-        Math.round((parte.subtotal + (llevaEnvio ? costoEnvio : 0)) * 100) / 100,
-    };
-  });
+function vendedoresDelPedido(lineas: LineaPedido[]): Vendedor[] {
+  const presentes = new Set(lineas.map((l) => vendedorDeCategoria(l.categoria)));
+  return (["skates", "ropa"] as const).filter((v) => presentes.has(v));
 }
 
 async function cargarPedido(id: string) {
   try {
     const supabase = createAnonClient();
 
-    // Dos funciones SECURITY DEFINER: `pedidos` y `pedidos_items` sólo son
-    // legibles por admins, y el comprador no tiene cuenta. Ver
-    // `supabase/consulta_pedido_publico.sql`.
     const [resumen, items] = await Promise.all([
       supabase.rpc("obtener_resumen_pedido", { p_id: id }).maybeSingle(),
       supabase.rpc("obtener_items_pedido", { p_id: id }),
@@ -121,8 +79,8 @@ export default async function CheckoutExitoPage({
 
   const { resumen, lineas } = pedido;
   const numeroCorto = id.slice(0, 8).toUpperCase();
-  const partes = repartir(lineas, resumen.costo_envio ?? 0);
-  const esMixto = partes.length > 1;
+  const vendedores = vendedoresDelPedido(lineas);
+  const esMixto = vendedores.length > 1;
   const yaConfirmado = resumen.estado !== "pendiente";
 
   return (
@@ -144,16 +102,21 @@ export default async function CheckoutExitoPage({
           <span className="font-mono font-bold text-black">#{numeroCorto}</span>{" "}
           está apartado. Guarda este número.
         </p>
-
-        <p className="mt-1 font-mono text-2xl font-black text-black">
-          Total: {moneda.format(resumen.total)}
-        </p>
       </header>
+
+      {/* Aviso de la ventana de 1 hora, bien visible. */}
+      <p className="mt-8 flex items-start gap-3 border-2 border-black bg-neutral-50 px-4 py-4 text-sm">
+        <Clock className="mt-0.5 h-5 w-5 shrink-0" aria-hidden />
+        <span className="leading-relaxed text-black">
+          <strong>Tienes 1 hora para yapear.</strong> Pasado ese plazo el pedido
+          se cancela solo y las unidades vuelven al catálogo.
+        </span>
+      </p>
 
       {DATOS_DE_PAGO_SIN_CONFIGURAR && (
         <p
           role="alert"
-          className="mt-8 flex items-start gap-2 border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="mt-6 flex items-start gap-2 border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           Los números de Yape salen de los valores por defecto del código.
@@ -165,7 +128,7 @@ export default async function CheckoutExitoPage({
       {lineas.length === 0 && (
         <p
           role="alert"
-          className="mt-8 flex items-start gap-2 border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          className="mt-6 flex items-start gap-2 border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           No pudimos leer el detalle de tu pedido. Escríbenos por WhatsApp con
@@ -173,28 +136,92 @@ export default async function CheckoutExitoPage({
         </p>
       )}
 
-      {esMixto && (
-        <div className="mt-8 border-2 border-black bg-neutral-50 p-5">
-          <p className="text-sm leading-relaxed font-bold text-black">
-            Tu pedido contiene ropa y skates. Por favor, realiza dos Yapes a los
-            siguientes números:
-          </p>
-          <p className="mt-2 text-xs text-neutral-600">
-            Son dos vendedores distintos. Los dos montos juntos suman{" "}
-            {moneda.format(resumen.total)}.
-          </p>
-        </div>
-      )}
+      {/* Monto único a pagar */}
+      <section className="mt-6 border-2 border-black bg-white p-6 sm:p-8">
+        <h2 className="text-[11px] font-bold tracking-[0.25em] text-neutral-500 uppercase">
+          Yapea el monto exacto
+        </h2>
 
-      {partes.map((parte) => (
-        <BloqueVendedor
-          key={parte.vendedor}
-          parte={parte}
-          pedidoId={id}
-          numeroCorto={numeroCorto}
-          mostrarEtiqueta={esMixto}
-        />
-      ))}
+        <p className="mt-4 font-mono text-4xl font-black text-black">
+          {moneda.format(resumen.total)}
+        </p>
+
+        <p className="mt-2 text-xs text-neutral-500">
+          Referencia:{" "}
+          <span className="font-mono font-bold text-black">#{numeroCorto}</span>
+          {" · "}
+          El flete de la agencia no está incluido.
+        </p>
+
+        {esMixto ? (
+          <p className="mt-6 border-t border-neutral-200 pt-6 text-sm leading-relaxed font-bold text-black">
+            Tu pedido es mixto. Puedes yapear el monto total a CUALQUIERA de
+            estos dos números:
+          </p>
+        ) : (
+          <p className="mt-6 border-t border-neutral-200 pt-6 text-sm text-neutral-700">
+            Yapea al siguiente número:
+          </p>
+        )}
+
+        <div
+          className={`mt-5 grid gap-5 ${esMixto ? "sm:grid-cols-2" : ""}`}
+        >
+          {vendedores.map((clave) => {
+            const datos = VENDEDORES[clave];
+            return (
+              <div
+                key={clave}
+                className="flex flex-col items-center gap-3 border border-neutral-200 p-4 text-center"
+              >
+                <span className="text-[11px] font-bold tracking-[0.2em] text-neutral-500 uppercase">
+                  {datos.etiqueta}
+                </span>
+
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={datos.qr}
+                  alt={`Código QR de Yape para ${datos.etiqueta}`}
+                  className="h-40 w-40 border border-neutral-200 object-contain"
+                />
+
+                <span className="font-mono text-lg font-black text-black">
+                  {agruparNumero(datos.numero)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* WhatsApp */}
+      <section className="mt-6 border border-neutral-200 bg-white p-6 sm:p-8">
+        <h2 className="text-[11px] font-bold tracking-[0.25em] text-neutral-500 uppercase">
+          Envíanos la captura
+        </h2>
+
+        <p className="mt-4 text-sm leading-relaxed text-neutral-700">
+          {esMixto
+            ? "Manda la captura al mismo número al que yapeaste."
+            : "Manda la captura del yapeo y confirmamos tu pedido."}{" "}
+          Sin la captura no podemos despacharlo.
+        </p>
+
+        <div className={`mt-6 grid gap-3 ${esMixto ? "sm:grid-cols-2" : ""}`}>
+          {vendedores.map((clave) => (
+            <a
+              key={clave}
+              href={enlaceWhatsAppPedido(clave, id, resumen.total)}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 bg-[#25D366] py-4 text-sm font-black tracking-[0.15em] text-white uppercase transition-opacity hover:opacity-90"
+            >
+              <MessageCircle className="h-5 w-5" aria-hidden />
+              {esMixto ? VENDEDORES[clave].etiqueta : "Enviar captura"}
+            </a>
+          ))}
+        </div>
+      </section>
 
       {yaConfirmado && (
         <p
@@ -207,12 +234,13 @@ export default async function CheckoutExitoPage({
         </p>
       )}
 
-      <p className="mt-10 text-center text-xs text-neutral-500">
-        Tenemos tu pedido apartado <strong>24 horas</strong>. Pasado ese plazo
-        las unidades vuelven al catálogo.
-      </p>
-
-      <div className="mt-6 text-center">
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-6">
+        <Link
+          href={`/seguimiento?id=${id}`}
+          className="text-[11px] font-bold tracking-[0.2em] text-black uppercase underline underline-offset-4"
+        >
+          Seguir mi pedido
+        </Link>
         <Link
           href="/productos"
           className="text-[11px] font-bold tracking-[0.2em] text-neutral-500 uppercase underline-offset-4 hover:text-black hover:underline"
@@ -221,97 +249,5 @@ export default async function CheckoutExitoPage({
         </Link>
       </div>
     </div>
-  );
-}
-
-function BloqueVendedor({
-  parte,
-  pedidoId,
-  numeroCorto,
-  mostrarEtiqueta,
-}: {
-  parte: Reparto;
-  pedidoId: string;
-  numeroCorto: string;
-  mostrarEtiqueta: boolean;
-}) {
-  const datos = VENDEDORES[parte.vendedor];
-
-  return (
-    <section className="mt-6 border-2 border-black bg-white p-6 sm:p-8">
-      <h2 className="text-[11px] font-bold tracking-[0.25em] text-neutral-500 uppercase">
-        {mostrarEtiqueta
-          ? `Yape ${datos.etiqueta} · ${moneda.format(parte.aPagar)}`
-          : "Yapea el monto exacto"}
-      </h2>
-
-      <p className="mt-5 text-sm leading-relaxed text-neutral-700">
-        Para procesar tu envío, yapea el monto exacto de{" "}
-        <span className="font-mono text-lg font-black text-black">
-          {moneda.format(parte.aPagar)}
-        </span>{" "}
-        al número{" "}
-        <span className="font-mono font-black text-black">
-          {agruparNumero(datos.numero)}
-        </span>{" "}
-        ({datos.etiqueta}).
-      </p>
-
-      <div className="mt-6 flex flex-col gap-6 sm:flex-row sm:items-start">
-        <div className="shrink-0">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={datos.qr}
-            alt={`Código QR de Yape para ${datos.etiqueta}`}
-            className="h-40 w-40 border border-neutral-200 object-contain"
-          />
-        </div>
-
-        <dl className="flex-1 divide-y divide-neutral-200 border-y border-neutral-200 text-sm">
-          <div className="flex items-baseline justify-between gap-4 py-3">
-            <dt className="text-neutral-500">Productos</dt>
-            <dd className="font-mono text-black">
-              {moneda.format(parte.subtotal)}
-            </dd>
-          </div>
-          {parte.llevaEnvio && parte.aPagar !== parte.subtotal && (
-            <div className="flex items-baseline justify-between gap-4 py-3">
-              <dt className="text-neutral-500">Envío</dt>
-              <dd className="font-mono text-black">
-                {moneda.format(parte.aPagar - parte.subtotal)}
-              </dd>
-            </div>
-          )}
-          <div className="flex items-baseline justify-between gap-4 py-3">
-            <dt className="font-bold text-black">A yapear</dt>
-            <dd className="font-mono text-xl font-black text-black">
-              {moneda.format(parte.aPagar)}
-            </dd>
-          </div>
-          <div className="flex items-baseline justify-between gap-4 py-3">
-            <dt className="text-neutral-500">Referencia</dt>
-            <dd className="font-mono font-bold text-black">#{numeroCorto}</dd>
-          </div>
-        </dl>
-      </div>
-
-      <ul className="mt-5 space-y-1 border-t border-neutral-200 pt-4 text-xs text-neutral-500">
-        {parte.lineas.map((linea) => (
-          <li key={`${linea.titulo}-${linea.precio_unitario}`}>
-            {linea.cantidad} × {linea.titulo}
-          </li>
-        ))}
-      </ul>
-
-      <a
-        href={enlaceWhatsAppPedido(parte.vendedor, pedidoId, parte.aPagar)}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="mt-6 flex w-full items-center justify-center gap-2 bg-[#25D366] py-4 text-sm font-black tracking-[0.15em] text-white uppercase transition-opacity hover:opacity-90"
-      >
-        <MessageCircle className="h-5 w-5" aria-hidden />
-        Enviar captura · {datos.etiqueta}
-      </a>
-    </section>
   );
 }
