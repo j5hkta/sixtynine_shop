@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 
+import CarruselBanners, {
+  type BannerPortada,
+} from "@/components/tienda/CarruselBanners";
 import ProductCard from "@/components/tienda/ProductCard";
 import { createAnonClient } from "@/lib/supabase/anon";
 
@@ -9,7 +12,7 @@ import { createAnonClient } from "@/lib/supabase/anon";
  * primera visita tras expirar dispara la regeneración en segundo plano. Nadie
  * espera por ella — quien llega recibe la versión anterior.
  *
- * Al guardar el banner desde el panel se llama a `revalidatePath("/", "page")`,
+ * Al tocar los banners desde el panel se llama a `revalidatePath("/", "page")`,
  * así que ese cambio no espera los 60 s.
  */
 export const revalidate = 60;
@@ -29,7 +32,7 @@ type DatosPortada = {
     categoria: string | null;
     imagenes: string[] | null;
   }[];
-  banner: { banner_imagen: string | null; banner_link: string | null } | null;
+  banners: BannerPortada[];
   error: string | null;
 };
 
@@ -43,7 +46,11 @@ async function cargarPortada(): Promise<DatosPortada> {
   try {
     const supabase = createAnonClient();
 
-    const [productos, config] = await Promise.all([
+    // El cliente anónimo no lee cookies, así que la página sigue siendo
+    // estática. La política RLS ya filtra los inactivos, pero el `.eq` se deja
+    // explícito: quien lea esta consulta no debería tener que ir al SQL para
+    // saber qué se está pidiendo.
+    const [productos, banners] = await Promise.all([
       supabase
         .from("productos")
         .select(CAMPOS_TARJETA)
@@ -51,51 +58,48 @@ async function cargarPortada(): Promise<DatosPortada> {
         .order("creado_en", { ascending: false })
         .limit(8),
       supabase
-        .from("configuracion_tienda")
-        .select("banner_imagen, banner_link")
-        .eq("id", 1)
-        .maybeSingle(),
+        .from("banners")
+        .select("id, imagen_url, categoria")
+        .eq("activo", true)
+        .order("orden", { ascending: true })
+        .order("creado_en", { ascending: true }),
     ]);
 
     if (productos.error) throw productos.error;
 
-    // Un fallo leyendo el banner no debe tumbar la portada entera: sin banner
+    // Un fallo leyendo los banners no debe tumbar la portada entera: sin ellos
     // la página sigue siendo perfectamente usable.
-    if (config.error) {
-      console.error("[tienda] No se pudo leer el banner:", config.error.message);
+    if (banners.error) {
+      console.error(
+        "[tienda] No se pudieron leer los banners:",
+        banners.error.message,
+      );
     }
 
     return {
       ultimos: productos.data ?? [],
-      banner: config.data ?? null,
+      banners: banners.data ?? [],
       error: null,
     };
   } catch (e) {
     const mensaje = e instanceof Error ? e.message : "Error desconocido.";
     console.error("[tienda] No se pudo cargar la portada:", mensaje);
-    return { ultimos: [], banner: null, error: mensaje };
+    return { ultimos: [], banners: [], error: mensaje };
   }
 }
 
 export default async function HomePage() {
-  const { ultimos, banner, error } = await cargarPortada();
-
-  const bannerLink = banner?.banner_link ?? "/productos";
+  const { ultimos, banners, error } = await cargarPortada();
 
   return (
     <>
-      {/* Banner principal, a todo el ancho */}
+      {/* Banners, a todo el ancho */}
       <section>
-        <Link href={bannerLink} className="block w-full">
-          {banner?.banner_imagen ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={banner.banner_imagen}
-              alt="Ver la colección"
-              className="h-auto w-full object-cover"
-            />
-          ) : (
-            // Respaldo mientras no haya banner subido desde /admin/apariencia.
+        {banners.length > 0 ? (
+          <CarruselBanners banners={banners} />
+        ) : (
+          // Respaldo mientras no haya banners subidos desde /admin/apariencia.
+          <Link href="/productos" className="block w-full">
             <div className="flex min-h-[45vh] w-full flex-col items-center justify-center gap-6 bg-black px-4 py-24 text-center text-white">
               <h1 className="text-5xl leading-[0.9] font-black tracking-tighter uppercase sm:text-7xl">
                 Outlet
@@ -109,8 +113,8 @@ export default async function HomePage() {
                 Ver la colección
               </span>
             </div>
-          )}
-        </Link>
+          </Link>
+        )}
       </section>
 
       {/* Cuadrícula de productos */}

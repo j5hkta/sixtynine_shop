@@ -43,3 +43,23 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/*
+ * Oculta la barra de scroll sin desactivar el scroll.
+ *
+ * Tailwind no trae esta utilidad y hacen falta dos declaraciones distintas:
+ * `scrollbar-width` es el estándar (Firefox) y el pseudoelemento `::-webkit-
+ * scrollbar` cubre Chrome, Edge y Safari. Se usa en el carrusel de la portada y
+ * en la barra de categorías del Navbar, donde la barra nativa parte el diseño.
+ *
+ * Sólo para carruseles horizontales con affordance propia (las imágenes se ven
+ * cortadas por el borde, que ya invita a deslizar). No la apliques a una
+ * columna con scroll vertical: ahí la barra es la única pista de que hay más.
+ */
+@utility scrollbar-hide {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

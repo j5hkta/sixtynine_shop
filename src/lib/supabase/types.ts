@@ -196,6 +196,39 @@ export type Database = {
           },
         ];
       };
+      /** Ver `supabase/banners.sql`. Carrusel de la portada. */
+      banners: {
+        Row: {
+          id: string;
+          imagen_url: string;
+          categoria: string;
+          orden: number;
+          activo: boolean;
+          creado_en: string;
+        };
+        Insert: {
+          id?: string;
+          imagen_url: string;
+          categoria?: string;
+          orden?: number;
+          activo?: boolean;
+          creado_en?: string;
+        };
+        Update: {
+          id?: string;
+          imagen_url?: string;
+          categoria?: string;
+          orden?: number;
+          activo?: boolean;
+          creado_en?: string;
+        };
+        Relationships: [];
+      };
+      /**
+       * Modelo antiguo de banner único, sustituido por `banners`. La tabla
+       * sigue existiendo con los datos que ya tenía; `supabase/banners.sql`
+       * copió su imagen a la nueva. Ya no se lee desde la aplicación.
+       */
       configuracion_tienda: {
         Row: {
           id: number;
