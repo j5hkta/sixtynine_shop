@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AlertTriangle, CheckCircle2, Clock, MessageCircle } from "lucide-react";
 
+import CodigoSeguimiento from "@/components/tienda/CodigoSeguimiento";
 import LimpiarCarrito from "@/components/tienda/LimpiarCarrito";
 import { moneda } from "@/lib/formato";
 import {
@@ -98,11 +99,14 @@ export default async function CheckoutExitoPage({
         </h1>
 
         <p className="mt-3 text-sm text-neutral-600">
-          Tu pedido{" "}
-          <span className="font-mono font-bold text-black">#{numeroCorto}</span>{" "}
-          está apartado. Guarda este número.
+          Ya apartamos tus unidades.
         </p>
       </header>
+
+      {/* El código va completo y a la vista: el buscador de /seguimiento acepta
+          también el corto, pero el UUID entero es el único que nunca resulta
+          ambiguo, y es lo que el comprador debe guardar. */}
+      <CodigoSeguimiento id={id} />
 
       {/* Aviso de la ventana de 1 hora, bien visible. */}
       <p className="mt-8 flex items-start gap-3 border-2 border-black bg-neutral-50 px-4 py-4 text-sm">

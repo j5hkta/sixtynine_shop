@@ -61,18 +61,32 @@ const PRESENTACION: Record<
   },
 };
 
-/** Sólo se aceptan UUID: cualquier otra cosa no llega a la base de datos. */
-function esUuid(valor: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    valor,
-  );
+/**
+ * Deja el término listo para buscar y decide si merece la pena consultar.
+ *
+ * Ya no se exige un UUID perfecto: vale el código corto de 8 caracteres que le
+ * damos al comprador, con o sin `#`, en mayúsculas o minúsculas, y con los
+ * espacios que arrastre al copiar y pegar.
+ *
+ * El mínimo de 8 no es cosmético. Como la consulta casa por prefijo, un término
+ * más corto identificaría a varios pedidos a la vez; `buscar_pedido_publico`
+ * también lo rechaza en el servidor, esto sólo evita el viaje.
+ */
+function normalizarTermino(valor: string): string | null {
+  const limpio = valor
+    .trim()
+    .replace(/\s+/g, "")
+    .replace(/^#+/, "")
+    .toLowerCase();
+
+  return /^[0-9a-f-]{8,36}$/.test(limpio) ? limpio : null;
 }
 
-async function cargarPedido(id: string) {
+async function cargarPedido(termino: string) {
   try {
     const supabase = createAnonClient();
     const { data, error } = await supabase
-      .rpc("obtener_resumen_pedido", { p_id: id })
+      .rpc("buscar_pedido_publico", { p_termino: termino })
       .maybeSingle();
 
     if (error) throw error;
@@ -93,8 +107,8 @@ export default async function SeguimientoPage({
   const idCrudo = typeof params.id === "string" ? params.id.trim() : "";
 
   const buscado = idCrudo.length > 0;
-  const idValido = esUuid(idCrudo);
-  const pedido = idValido ? await cargarPedido(idCrudo) : null;
+  const termino = normalizarTermino(idCrudo);
+  const pedido = termino ? await cargarPedido(termino) : null;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6">
@@ -104,9 +118,9 @@ export default async function SeguimientoPage({
         </h1>
         <span className="mt-4 block h-1 w-16 bg-black" aria-hidden />
         <p className="mt-4 text-sm leading-relaxed text-neutral-600">
-          Ingresa el número de pedido que te dimos al confirmar la compra. Es el
-          código largo que aparece en la barra de direcciones de tu pantalla de
-          confirmación, y también en el mensaje que nos enviaste por WhatsApp.
+          Ingresa el código de seguimiento que te dimos al confirmar la compra.
+          Puedes pegarlo completo o escribir sólo los primeros 8 caracteres, con
+          o sin el <span className="font-mono font-bold text-black">#</span>.
         </p>
       </header>
 
@@ -119,7 +133,7 @@ export default async function SeguimientoPage({
       >
         <div className="relative flex-1">
           <label htmlFor="id" className="sr-only">
-            Número de pedido
+            Código de seguimiento
           </label>
           <Search
             className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-neutral-400"
@@ -130,7 +144,7 @@ export default async function SeguimientoPage({
             name="id"
             type="text"
             defaultValue={idCrudo}
-            placeholder="a1b2c3d4-...."
+            placeholder="D8D30EB3 o el código completo"
             className="w-full border border-neutral-400 bg-white py-3 pr-3 pl-9 font-mono text-sm text-black transition-colors placeholder:text-neutral-400 focus:border-black focus:outline-none"
           />
         </div>
@@ -143,29 +157,29 @@ export default async function SeguimientoPage({
         </button>
       </form>
 
-      {buscado && !idValido && (
+      {buscado && !termino && (
         <p
           role="alert"
           className="mt-8 flex items-start gap-2 border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-neutral-700"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          Ese no parece un número de pedido válido. Cópialo completo, con los
-          guiones.
+          Ese código no tiene la forma que esperamos. Escribe al menos los 8
+          primeros caracteres, tal como aparecen en tu confirmación.
         </p>
       )}
 
-      {buscado && idValido && !pedido && (
+      {buscado && termino && !pedido && (
         <p
           role="alert"
           className="mt-8 flex items-start gap-2 border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-neutral-700"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          No encontramos ningún pedido con ese número. Revisa que esté completo
+          No encontramos ningún pedido con ese código. Prueba a pegarlo completo
           o escríbenos por WhatsApp.
         </p>
       )}
 
-      {pedido && <Resultado id={idCrudo} pedido={pedido} />}
+      {pedido && <Resultado pedido={pedido} />}
 
       {!buscado && (
         <p className="mt-10 border border-dashed border-neutral-300 px-6 py-12 text-center text-sm text-neutral-500">
@@ -177,11 +191,11 @@ export default async function SeguimientoPage({
 }
 
 function Resultado({
-  id,
   pedido,
 }: {
-  id: string;
   pedido: {
+    /** Viene de la base de datos, no del buscador: el término pudo ser un prefijo. */
+    id: string;
     total: number;
     estado: string;
     creado_en: string;
@@ -225,8 +239,11 @@ function Resultado({
       <dl className="mt-6 divide-y divide-neutral-200 border-y border-neutral-200 text-sm">
         <div className="flex items-baseline justify-between gap-4 py-3">
           <dt className="text-neutral-500">Pedido</dt>
-          <dd className="font-mono font-bold text-black">
-            #{id.slice(0, 8).toUpperCase()}
+          <dd className="text-right font-mono font-bold text-black">
+            #{pedido.id.slice(0, 8).toUpperCase()}
+            <span className="block text-[10px] font-normal break-all text-neutral-400">
+              {pedido.id}
+            </span>
           </dd>
         </div>
         <div className="flex items-baseline justify-between gap-4 py-3">

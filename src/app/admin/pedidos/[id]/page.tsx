@@ -3,16 +3,19 @@ import { notFound } from "next/navigation";
 import {
   AlertTriangle,
   ArrowLeft,
+  Building2,
   CalendarClock,
   IdCard,
   ImageOff,
   MapPin,
   Phone,
+  Truck,
   User,
 } from "lucide-react";
 
 import FormularioEnvio from "@/components/admin/FormularioEnvio";
 import SelectorEstadoPedido from "@/components/admin/SelectorEstadoPedido";
+import { AGENCIAS, esAgenciaValida } from "@/lib/envio";
 import { fecha, moneda } from "@/lib/formato";
 import { createClient } from "@/lib/supabase/server";
 
@@ -71,6 +74,14 @@ export default async function DetallePedidoPage({
   // El total guardado es el que se cobró. Si no cuadra, alguien editó datos a
   // mano y conviene saberlo.
   const descuadre = Math.abs(esperado - pedido.total) > 0.005;
+
+  // Los pedidos anteriores al cambio de modelo no tienen agencia: se muestra el
+  // hueco en vez de ocultar el bloque, porque un envío sin destino es
+  // justamente lo que hay que notar antes de empaquetar.
+  const nombreAgencia =
+    pedido.agencia && esAgenciaValida(pedido.agencia)
+      ? AGENCIAS[pedido.agencia].etiqueta
+      : null;
 
   return (
     <div className="space-y-8">
@@ -134,11 +145,27 @@ export default async function DetallePedidoPage({
                 {pedido.cliente_telefono}
               </a>
             </Dato>
-            <Dato icono={MapPin} etiqueta="Dirección de envío">
+            <Dato icono={MapPin} etiqueta="Ciudad / Distrito">
               {pedido.direccion_envio}
             </Dato>
             <Dato icono={CalendarClock} etiqueta="Fecha">
               {fecha.format(new Date(pedido.creado_en))}
+            </Dato>
+          </dl>
+
+          {/* Destacado: son los dos datos que hay que leer para rotular el
+              paquete, y perderlos entre el resto obligaría a buscarlos en cada
+              pedido. */}
+          <dl className="mt-6 space-y-4 border-2 border-neon bg-neon/5 p-4">
+            <Dato icono={Truck} etiqueta="Agencia" destacado>
+              {nombreAgencia ?? (
+                <span className="text-amber-400">Sin agencia registrada</span>
+              )}
+            </Dato>
+            <Dato icono={Building2} etiqueta="Sede de recojo" destacado>
+              {pedido.sede_agencia ?? (
+                <span className="text-amber-400">Sin sede registrada</span>
+              )}
             </Dato>
           </dl>
 
@@ -274,22 +301,33 @@ function Dato({
   icono: Icono,
   etiqueta,
   mono,
+  destacado,
   children,
 }: {
   icono: React.ComponentType<{ className?: string; "aria-hidden"?: boolean }>;
   etiqueta: string;
   mono?: boolean;
+  destacado?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex gap-3">
-      <Icono className="mt-0.5 h-4 w-4 shrink-0 text-neutral-600" aria-hidden />
+      <Icono
+        className={`mt-0.5 h-4 w-4 shrink-0 ${destacado ? "text-neon" : "text-neutral-600"}`}
+        aria-hidden
+      />
       <div className="min-w-0">
-        <dt className="text-[10px] font-bold tracking-[0.2em] text-neutral-600 uppercase">
+        <dt
+          className={`text-[10px] font-bold tracking-[0.2em] uppercase ${
+            destacado ? "text-neon" : "text-neutral-600"
+          }`}
+        >
           {etiqueta}
         </dt>
         <dd
-          className={`mt-0.5 break-words text-white ${mono ? "font-mono" : ""}`}
+          className={`mt-0.5 break-words text-white ${mono ? "font-mono" : ""} ${
+            destacado ? "text-base font-bold" : ""
+          }`}
         >
           {children}
         </dd>

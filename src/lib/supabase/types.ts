@@ -251,6 +251,26 @@ export type Database = {
           tracking_clave: string | null;
         }[];
       };
+      /**
+       * Ver `supabase/seguimiento_flexible.sql`. Igual que
+       * `obtener_resumen_pedido` pero aceptando el código corto que ve el
+       * comprador, no sólo el UUID entero. Devuelve el `id` completo para que
+       * la página no tenga que confiar en lo que se tecleó en el buscador.
+       */
+      buscar_pedido_publico: {
+        Args: { p_termino: string };
+        Returns: {
+          id: string;
+          total: number;
+          costo_envio: number;
+          estado: string;
+          creado_en: string;
+          agencia: string | null;
+          sede_agencia: string | null;
+          tracking_numero: string | null;
+          tracking_clave: string | null;
+        }[];
+      };
       /** Líneas del pedido, para repartir el cobro entre los dos vendedores. */
       obtener_items_pedido: {
         Args: { p_id: string };
