@@ -21,7 +21,7 @@ export default async function EditarProductoPage({
   const { data: producto, error } = await supabase
     .from("productos")
     .select(
-      "id, titulo, descripcion, precio, stock, categoria, tallas, imagenes, estado",
+      "id, titulo, descripcion, precio, precio_original, stock, categoria, tallas, imagenes, estado",
     )
     .eq("id", id)
     .maybeSingle();
@@ -73,6 +73,12 @@ export default async function EditarProductoPage({
           titulo: producto.titulo,
           descripcion: producto.descripcion ?? "",
           precio: producto.precio,
+          // Cadena vacía, no 0: el campo es opcional y `null` significa "sin
+          // descuento". Un 0 de relleno guardaría un descuento inválido.
+          precioOriginal:
+            producto.precio_original === null
+              ? ""
+              : String(producto.precio_original),
           stock: producto.stock,
           categoria: producto.categoria ?? "",
           // La BD devuelve text[]; el campo de tallas trabaja con texto

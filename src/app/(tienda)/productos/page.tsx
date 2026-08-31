@@ -25,7 +25,7 @@ async function cargarCatalogo() {
     const supabase = createAnonClient();
     const { data, error } = await supabase
       .from("productos")
-      .select("id, titulo, precio, categoria, imagenes")
+      .select("id, titulo, precio, precio_original, categoria, imagenes")
       .eq("estado", "activo")
       .order("creado_en", { ascending: false });
 
@@ -50,8 +50,8 @@ export default async function CatalogoPage() {
         </h1>
 
         <p className="mt-2 text-sm text-neutral-500">
-          {productos.length}{" "}
-          {productos.length === 1 ? "producto" : "productos"} disponibles.
+          {productos.length} {productos.length === 1 ? "producto" : "productos"}{" "}
+          disponibles.
         </p>
       </header>
 

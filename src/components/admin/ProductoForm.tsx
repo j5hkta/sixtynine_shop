@@ -24,6 +24,8 @@ export type ValoresProducto = {
   titulo: string;
   descripcion: string;
   precio: number;
+  /** Vacío si el producto no está rebajado. */
+  precioOriginal: string;
   stock: number;
   categoria: string;
   /** Separadas por coma, ej. "S, M, L". */
@@ -37,6 +39,7 @@ const VACIO: ValoresProducto = {
   titulo: "",
   descripcion: "",
   precio: 0,
+  precioOriginal: "",
   stock: 0,
   categoria: "",
   tallas: "",
@@ -148,6 +151,29 @@ export default function ProductoForm({
             className={`${inputClase} font-mono`}
           />
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="precio_original" className={labelClase}>
+          Precio Original (Sin descuento)
+        </label>
+        <input
+          id="precio_original"
+          name="precio_original"
+          type="number"
+          min={0}
+          step={0.01}
+          defaultValue={valores.precioOriginal}
+          placeholder="Vacío si no hay descuento"
+          aria-describedby="precio-original-ayuda"
+          className={`${inputClase} font-mono sm:max-w-[calc(50%-0.75rem)]`}
+        />
+        <p id="precio-original-ayuda" className={ayudaClase}>
+          Opcional. Si lo rellenas, la tienda muestra este importe tachado, el
+          precio actual en rojo y un badge con el descuento. Tiene que ser{" "}
+          <strong>mayor</strong> que el precio; el cobro siempre usa el precio
+          actual.
+        </p>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2">

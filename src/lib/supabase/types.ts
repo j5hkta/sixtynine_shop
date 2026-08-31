@@ -27,11 +27,7 @@ export type RolUsuario = "cliente" | "admin";
 
 /** Estados de `public.pedidos` (ver `supabase/pedidos_schema.sql`). */
 export type EstadoPedido =
-  | "pendiente"
-  | "confirmado"
-  | "enviado"
-  | "entregado"
-  | "cancelado";
+  "pendiente" | "confirmado" | "enviado" | "entregado" | "cancelado";
 
 export type Database = {
   public: {
@@ -43,6 +39,8 @@ export type Database = {
           titulo: string;
           descripcion: string | null;
           precio: number;
+          /** Precio tachado. Null = sin descuento. Ver `marketing_descuentos.sql`. */
+          precio_original: number | null;
           stock: number;
           categoria: string | null;
           tallas: string[] | null;
@@ -55,6 +53,7 @@ export type Database = {
           titulo: string;
           descripcion?: string | null;
           precio: number;
+          precio_original?: number | null;
           stock?: number;
           categoria?: string | null;
           tallas?: string[] | null;
@@ -67,6 +66,7 @@ export type Database = {
           titulo?: string;
           descripcion?: string | null;
           precio?: number;
+          precio_original?: number | null;
           stock?: number;
           categoria?: string | null;
           tallas?: string[] | null;
@@ -195,6 +195,34 @@ export type Database = {
             referencedColumns: ["id"];
           },
         ];
+      };
+      /** Ver `supabase/marketing_descuentos.sql`. Barra superior de la tienda. */
+      anuncios: {
+        Row: {
+          id: string;
+          texto: string;
+          url_destino: string | null;
+          orden: number;
+          activo: boolean;
+          creado_en: string;
+        };
+        Insert: {
+          id?: string;
+          texto: string;
+          url_destino?: string | null;
+          orden?: number;
+          activo?: boolean;
+          creado_en?: string;
+        };
+        Update: {
+          id?: string;
+          texto?: string;
+          url_destino?: string | null;
+          orden?: number;
+          activo?: boolean;
+          creado_en?: string;
+        };
+        Relationships: [];
       };
       /** Ver `supabase/banners.sql`. Carrusel de la portada. */
       banners: {

@@ -5,6 +5,7 @@ import { ArrowLeft, PackageCheck, PackageX } from "lucide-react";
 
 import AccionesProducto from "@/components/tienda/AccionesProducto";
 import GaleriaProducto from "@/components/tienda/GaleriaProducto";
+import { calcularDescuento } from "@/lib/descuento";
 import { moneda } from "@/lib/formato";
 import { createAnonClient } from "@/lib/supabase/anon";
 
@@ -54,7 +55,7 @@ async function cargarProducto(id: string) {
     const { data, error } = await supabase
       .from("productos")
       .select(
-        "id, titulo, descripcion, precio, stock, categoria, tallas, imagenes, estado",
+        "id, titulo, descripcion, precio, precio_original, stock, categoria, tallas, imagenes, estado",
       )
       .eq("id", id)
       .neq("estado", "borrador")
@@ -102,6 +103,10 @@ export default async function ProductoDetallePage({
   const imagenes = producto.imagenes ?? [];
   const tallas = producto.tallas ?? [];
   const hayStock = producto.stock > 0 && producto.estado !== "agotado";
+  const descuento = calcularDescuento(
+    producto.precio,
+    producto.precio_original,
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-16">
@@ -127,9 +132,31 @@ export default async function ProductoDetallePage({
             {producto.titulo}
           </h1>
 
-          <p className="mt-6 font-mono text-4xl font-black text-black">
-            {moneda.format(producto.precio)}
-          </p>
+          {descuento ? (
+            <div className="mt-6">
+              <div className="flex flex-wrap items-center gap-3">
+                <p className="font-mono text-4xl font-black text-red-600">
+                  {moneda.format(producto.precio)}
+                </p>
+                <span className="bg-red-600 px-2.5 py-1.5 text-xs font-black tracking-[0.1em] text-white">
+                  -{descuento.porcentaje}%
+                </span>
+              </div>
+
+              <p className="mt-1 font-mono text-lg text-gray-400 line-through">
+                {moneda.format(descuento.precioOriginal)}
+              </p>
+
+              <p className="mt-2 text-xs font-bold tracking-[0.15em] text-red-600 uppercase">
+                Ahorras{" "}
+                {moneda.format(descuento.precioOriginal - producto.precio)}
+              </p>
+            </div>
+          ) : (
+            <p className="mt-6 font-mono text-4xl font-black text-black">
+              {moneda.format(producto.precio)}
+            </p>
+          )}
 
           <p className="mt-4 flex items-center gap-2 text-xs font-bold tracking-wide uppercase">
             {hayStock ? (

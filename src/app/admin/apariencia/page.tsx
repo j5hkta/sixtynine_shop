@@ -4,14 +4,22 @@ import {
   EyeOff,
   ImageUp,
   Images,
+  Link2,
+  Megaphone,
   Tag,
 } from "lucide-react";
 
+import {
+  actualizarOrdenAnuncio,
+  crearAnuncio,
+  obtenerAnuncios,
+} from "@/actions/anuncios";
 import {
   actualizarOrden,
   crearBanner,
   obtenerBanners,
 } from "@/actions/banners";
+import AccionesAnuncio from "@/components/admin/AccionesAnuncio";
 import BotonEliminarBanner from "@/components/admin/BotonEliminarBanner";
 import BotonEstadoBanner from "@/components/admin/BotonEstadoBanner";
 import BotonGuardar from "@/components/admin/BotonGuardar";
@@ -34,8 +42,13 @@ export default async function AparienciaPage({
 }: PageProps<"/admin/apariencia">) {
   const { error, guardado } = await searchParams;
 
-  const resultado = await obtenerBanners();
+  const [resultado, resultadoAnuncios] = await Promise.all([
+    obtenerBanners(),
+    obtenerAnuncios(),
+  ]);
+
   const banners = resultado.ok ? resultado.banners : [];
+  const anuncios = resultadoAnuncios.ok ? resultadoAnuncios.anuncios : [];
 
   return (
     <div className="max-w-3xl space-y-8">
@@ -81,6 +94,17 @@ export default async function AparienciaPage({
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           No se pudieron leer los banners: {resultado.error}. ¿Ejecutaste{" "}
           <code>supabase/banners.sql</code>?
+        </p>
+      )}
+
+      {!resultadoAnuncios.ok && (
+        <p
+          role="alert"
+          className="flex items-start gap-2 border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          No se pudieron leer los anuncios: {resultadoAnuncios.error}.
+          ¿Ejecutaste <code>supabase/marketing_descuentos.sql</code>?
         </p>
       )}
 
@@ -309,6 +333,180 @@ export default async function AparienciaPage({
 
         <div className="border-t border-ink-line pt-6">
           <BotonGuardar>Añadir Banner</BotonGuardar>
+        </div>
+      </form>
+
+      {/* ---------------------------------------------------------------- */}
+      {/* Barra de anuncios                                                 */}
+      {/* ---------------------------------------------------------------- */}
+      <div className="border-t-2 border-ink-line pt-8">
+        <h2 className="text-2xl font-black tracking-tighter text-white uppercase">
+          Barra de anuncios
+        </h2>
+        <p className="mt-2 text-sm text-neutral-500">
+          Franja negra sobre el menú, en todas las páginas de la tienda. Con más
+          de un mensaje, rotan cada 3 segundos.
+        </p>
+      </div>
+
+      <section className="border border-ink-line bg-ink-soft p-6 sm:p-8">
+        <h3 className="flex items-center gap-2 text-[11px] font-bold tracking-[0.25em] text-neutral-500 uppercase">
+          <Megaphone className="h-4 w-4" aria-hidden />
+          Anuncios publicados ({anuncios.length})
+        </h3>
+
+        {anuncios.length === 0 ? (
+          <p className="mt-6 border border-dashed border-ink-line px-6 py-10 text-center text-sm text-neutral-500">
+            No hay anuncios. La barra no se muestra hasta que crees el primero.
+          </p>
+        ) : (
+          <ul className="mt-6 space-y-3">
+            {anuncios.map((anuncio) => (
+              <li
+                key={anuncio.id}
+                className={
+                  anuncio.activo
+                    ? "flex flex-col gap-4 border border-ink-line bg-ink p-4 sm:flex-row sm:items-center"
+                    : "flex flex-col gap-4 border border-dashed border-neutral-600 bg-ink/40 p-4 sm:flex-row sm:items-center"
+                }
+              >
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={`text-sm font-bold ${
+                      anuncio.activo ? "text-white" : "text-neutral-500"
+                    }`}
+                  >
+                    {anuncio.texto}
+                    {!anuncio.activo && (
+                      <span className="ml-2 inline-flex items-center gap-1 border border-ink-line px-2 py-0.5 align-middle text-[10px] font-bold tracking-[0.15em] text-neutral-500 uppercase">
+                        <EyeOff className="h-3 w-3" aria-hidden />
+                        Oculto
+                      </span>
+                    )}
+                  </p>
+
+                  {anuncio.url_destino && (
+                    <p className="mt-1 flex items-center gap-1.5 font-mono text-xs text-neutral-600">
+                      <Link2 className="h-3 w-3 shrink-0" aria-hidden />
+                      {anuncio.url_destino}
+                    </p>
+                  )}
+                </div>
+
+                <form
+                  action={actualizarOrdenAnuncio.bind(null, anuncio.id)}
+                  className="flex items-end gap-2"
+                >
+                  <div className="space-y-1">
+                    <label
+                      htmlFor={`orden-anuncio-${anuncio.id}`}
+                      className="block text-[10px] font-bold tracking-[0.2em] text-neutral-600 uppercase"
+                    >
+                      Orden
+                    </label>
+                    <input
+                      id={`orden-anuncio-${anuncio.id}`}
+                      name="orden"
+                      type="number"
+                      min={0}
+                      max={999}
+                      defaultValue={anuncio.orden}
+                      className="w-20 border border-ink-line bg-ink-soft px-3 py-2 text-sm text-white focus:border-neon focus:outline-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="border border-ink-line px-3 py-2 text-[10px] font-bold tracking-[0.15em] text-neutral-400 uppercase transition-colors hover:border-neon hover:text-neon"
+                  >
+                    Mover
+                  </button>
+                </form>
+
+                <AccionesAnuncio
+                  id={anuncio.id}
+                  activo={anuncio.activo}
+                  texto={anuncio.texto}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {/* Alta de anuncio */}
+      <form
+        action={crearAnuncio}
+        className="space-y-6 border border-ink-line bg-ink-soft p-6 sm:p-8"
+      >
+        <h3 className="text-[11px] font-bold tracking-[0.25em] text-neutral-500 uppercase">
+          Nuevo anuncio
+        </h3>
+
+        <div className="space-y-2">
+          <label htmlFor="texto" className={labelClase}>
+            Texto
+          </label>
+          <input
+            id="texto"
+            name="texto"
+            type="text"
+            required
+            minLength={3}
+            maxLength={120}
+            placeholder="Envío gratis en compras mayores a S/ 250"
+            aria-describedby="texto-ayuda"
+            className={inputClase}
+          />
+          <p id="texto-ayuda" className={ayudaClase}>
+            Máximo 120 caracteres. La barra es de una línea y no hace scroll: un
+            texto más largo se corta con puntos suspensivos.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="url_destino" className={labelClase}>
+            Enlace (opcional)
+          </label>
+
+          <div className="relative">
+            <Link2
+              className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-neutral-600"
+              aria-hidden
+            />
+            <input
+              id="url_destino"
+              name="url_destino"
+              type="text"
+              placeholder="/productos/categoria/tablas"
+              aria-describedby="url-ayuda"
+              className={`${inputClase} pl-10 font-mono`}
+            />
+          </div>
+
+          <p id="url-ayuda" className={ayudaClase}>
+            Ruta interna, empezando por <code>/</code>. Déjalo vacío si el
+            anuncio es sólo informativo. No se aceptan enlaces a otros dominios.
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="orden-anuncio" className={labelClase}>
+            Orden
+          </label>
+          <input
+            id="orden-anuncio"
+            name="orden"
+            type="number"
+            min={0}
+            max={999}
+            defaultValue={anuncios.length}
+            className={`${inputClase} max-w-[10rem]`}
+          />
+        </div>
+
+        <div className="border-t border-ink-line pt-6">
+          <BotonGuardar>Añadir Anuncio</BotonGuardar>
         </div>
       </form>
     </div>

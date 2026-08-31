@@ -2,8 +2,44 @@ import Link from "next/link";
 import NextTopLoader from "nextjs-toploader";
 
 import BotonWhatsApp from "@/components/BotonWhatsApp";
+import BarraAnuncios, {
+  type AnuncioBarra,
+} from "@/components/tienda/BarraAnuncios";
 import Navbar from "@/components/tienda/Navbar";
 import { CATEGORIAS, rutaDeCategoria } from "@/lib/categorias";
+import { createAnonClient } from "@/lib/supabase/anon";
+
+/**
+ * Anuncios de la barra superior.
+ *
+ * Con el cliente anónimo, no con `createClient()`: leer cookies aquí volvería
+ * dinámicas TODAS las páginas de la tienda, no sólo una, y se perdería el ISR
+ * del catálogo entero. La política RLS ya filtra los inactivos.
+ *
+ * Un fallo devuelve una lista vacía y la barra no se pinta: nunca debe tumbar
+ * el layout, porque se lleva por delante toda la tienda.
+ */
+async function cargarAnuncios(): Promise<AnuncioBarra[]> {
+  try {
+    const supabase = createAnonClient();
+    const { data, error } = await supabase
+      .from("anuncios")
+      .select("id, texto, url_destino")
+      .eq("activo", true)
+      .order("orden", { ascending: true })
+      .order("creado_en", { ascending: true });
+
+    if (error) throw error;
+
+    return data ?? [];
+  } catch (e) {
+    console.error(
+      "[tienda] No se pudieron leer los anuncios:",
+      e instanceof Error ? e.message : e,
+    );
+    return [];
+  }
+}
 
 /**
  * Layout de la tienda pública.
@@ -15,7 +51,9 @@ import { CATEGORIAS, rutaDeCategoria } from "@/lib/categorias";
  * Estética outlet: fondo blanco, texto negro, bordes grises finos. Las únicas
  * zonas negras son las dos franjas del Navbar y el pie.
  */
-export default function TiendaLayout({ children }: LayoutProps<"/">) {
+export default async function TiendaLayout({ children }: LayoutProps<"/">) {
+  const anuncios = await cargarAnuncios();
+
   return (
     <div className="flex min-h-screen flex-col bg-white text-black">
       {/* Barra negra: sobre fondo blanco el amarillo neón no se distingue. */}
@@ -27,6 +65,10 @@ export default function TiendaLayout({ children }: LayoutProps<"/">) {
         easing="ease"
         speed={250}
       />
+
+      {/* Encima del Navbar. No es sticky a propósito: el Navbar sí lo es, y
+          dos franjas fijas se comen media pantalla en móvil. */}
+      <BarraAnuncios anuncios={anuncios} />
 
       <Navbar />
 

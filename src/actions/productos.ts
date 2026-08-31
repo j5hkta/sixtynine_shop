@@ -53,6 +53,7 @@ type CamposProducto = {
   descripcion: string | null;
   categoria: string | null;
   precio: number;
+  precio_original: number | null;
   stock: number;
   tallas: string[];
   estado: EstadoProducto;
@@ -70,6 +71,13 @@ function leerCampos(formData: FormData, destinoError: string): CamposProducto {
   const stock = Number(texto(formData, "stock"));
   const estado = texto(formData, "estado") || "activo";
 
+  // Campo opcional: vacio significa "sin descuento", no cero. Se distingue
+  // antes de convertir, porque `Number("")` es 0 y guardaria un producto
+  // rebajado desde S/ 0.00.
+  const precioOriginalTexto = texto(formData, "precio_original");
+  const precioOriginal =
+    precioOriginalTexto === "" ? null : Number(precioOriginalTexto);
+
   if (!titulo) {
     volverConError(destinoError, "El título es obligatorio.");
   }
@@ -78,6 +86,33 @@ function leerCampos(formData: FormData, destinoError: string): CamposProducto {
       destinoError,
       "El precio debe ser un número mayor o igual a 0.",
     );
+  }
+  // Ambas columnas son numeric(10,2). Se redondea ANTES de comparar: dos
+  // valores que sólo se distinguen en el tercer decimal pasarian la validacion
+  // y luego chocarian contra la restriccion de la base ya redondeados a lo
+  // mismo.
+  const precioRedondeado = Math.round(precio * 100) / 100;
+  const precioOriginalRedondeado =
+    precioOriginal === null ? null : Math.round(precioOriginal * 100) / 100;
+
+  if (precioOriginalRedondeado !== null) {
+    if (
+      !Number.isFinite(precioOriginalRedondeado) ||
+      precioOriginalRedondeado <= 0
+    ) {
+      volverConError(
+        destinoError,
+        "El precio original debe ser un número mayor que 0, o quedar vacío.",
+      );
+    }
+    // La restriccion `productos_precio_original_coherente` rechazaria esto en
+    // la base, pero con un mensaje de Postgres que no ayuda a nadie.
+    if (precioOriginalRedondeado <= precioRedondeado) {
+      volverConError(
+        destinoError,
+        "El precio original debe ser mayor que el precio actual. Si el producto no está rebajado, deja el campo vacío.",
+      );
+    }
   }
   if (!Number.isInteger(stock) || stock < 0) {
     volverConError(
@@ -96,9 +131,8 @@ function leerCampos(formData: FormData, destinoError: string): CamposProducto {
     titulo,
     descripcion: descripcion || null,
     categoria: categoria || null,
-    // La columna es numeric(10,2): se redondea aqui para que lo guardado
-    // coincida con lo que el listado muestra.
-    precio: Math.round(precio * 100) / 100,
+    precio: precioRedondeado,
+    precio_original: precioOriginalRedondeado,
     stock,
     tallas: listaDeTexto(texto(formData, "tallas")),
     estado: estado as EstadoProducto,
@@ -187,7 +221,9 @@ export async function actualizarProducto(formData: FormData) {
 
   const conservadas = formData
     .getAll("imagenes_actuales")
-    .filter((valor): valor is string => typeof valor === "string" && valor !== "");
+    .filter(
+      (valor): valor is string => typeof valor === "string" && valor !== "",
+    );
 
   // `Set` evita repetir una URL si la imagen ya estaba y se vuelve a subir:
   // como el nombre del objeto es el hash del contenido, la URL es la misma.
@@ -272,13 +308,17 @@ export async function eliminarProducto(id: string): Promise<ResultadoBorrado> {
       };
     }
 
-    return { ok: false, error: `No se pudo eliminar el producto: ${error.message}` };
+    return {
+      ok: false,
+      error: `No se pudo eliminar el producto: ${error.message}`,
+    };
   }
 
   if (!data || data.length === 0) {
     return {
       ok: false,
-      error: "No se elimino el producto: no existe o tu cuenta no tiene permisos.",
+      error:
+        "No se elimino el producto: no existe o tu cuenta no tiene permisos.",
     };
   }
 

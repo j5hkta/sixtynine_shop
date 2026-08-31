@@ -5,7 +5,11 @@ import { AlertTriangle } from "lucide-react";
 
 import FiltroCategorias from "@/components/tienda/FiltroCategorias";
 import ProductCard from "@/components/tienda/ProductCard";
-import { CATEGORIAS, categoriaDesdeSlug, slugDeCategoria } from "@/lib/categorias";
+import {
+  CATEGORIAS,
+  categoriaDesdeSlug,
+  slugDeCategoria,
+} from "@/lib/categorias";
 import { createAnonClient } from "@/lib/supabase/anon";
 
 /** ISR: ver el comentario en `src/app/(tienda)/page.tsx`. */
@@ -49,7 +53,7 @@ async function cargarCategoria(categoria: string) {
     const supabase = createAnonClient();
     const { data, error } = await supabase
       .from("productos")
-      .select("id, titulo, precio, categoria, imagenes")
+      .select("id, titulo, precio, precio_original, categoria, imagenes")
       .eq("categoria", categoria)
       .eq("estado", "activo")
       .order("creado_en", { ascending: false });
@@ -59,7 +63,10 @@ async function cargarCategoria(categoria: string) {
     return { productos: data ?? [], error: null as string | null };
   } catch (e) {
     const mensaje = e instanceof Error ? e.message : "Error desconocido.";
-    console.error(`[tienda] No se pudo cargar la categoría ${categoria}:`, mensaje);
+    console.error(
+      `[tienda] No se pudo cargar la categoría ${categoria}:`,
+      mensaje,
+    );
     return { productos: [], error: mensaje };
   }
 }
@@ -91,7 +98,8 @@ export default async function CategoriaPage({
         </h1>
 
         <p className="mt-2 text-sm text-neutral-500">
-          {productos.length} {productos.length === 1 ? "producto" : "productos"}.
+          {productos.length} {productos.length === 1 ? "producto" : "productos"}
+          .
         </p>
       </header>
 

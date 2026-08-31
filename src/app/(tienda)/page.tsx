@@ -22,13 +22,15 @@ export const metadata = {
     "Tablas, ruedas, zapatillas y ropa para los que viven sobre cuatro ruedas.",
 };
 
-const CAMPOS_TARJETA = "id, titulo, precio, categoria, imagenes";
+const CAMPOS_TARJETA =
+  "id, titulo, precio, precio_original, categoria, imagenes";
 
 type DatosPortada = {
   ultimos: {
     id: string;
     titulo: string;
     precio: number;
+    precio_original: number | null;
     categoria: string | null;
     imagenes: string[] | null;
   }[];

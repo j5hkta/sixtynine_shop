@@ -20,7 +20,10 @@ const MAX_RESULTADOS = 60;
  * PostgREST no expone la cláusula ESCAPE, y nadie busca esos caracteres.
  */
 function limpiarTermino(valor: string): string {
-  return valor.replace(/[%_\\]/g, "").trim().slice(0, 80);
+  return valor
+    .replace(/[%_\\]/g, "")
+    .trim()
+    .slice(0, 80);
 }
 
 async function buscarProductos(termino: string) {
@@ -28,7 +31,7 @@ async function buscarProductos(termino: string) {
     const supabase = createAnonClient();
     const { data, error } = await supabase
       .from("productos")
-      .select("id, titulo, precio, categoria, imagenes")
+      .select("id, titulo, precio, precio_original, categoria, imagenes")
       .eq("estado", "activo")
       .ilike("titulo", `%${termino}%`)
       .order("creado_en", { ascending: false })
@@ -82,7 +85,9 @@ export default async function BuscarPage({
           <p className="mt-2 text-sm text-neutral-500">
             {productos.length}{" "}
             {productos.length === 1 ? "resultado" : "resultados"}
-            {productos.length === MAX_RESULTADOS ? " (mostrando los primeros)" : ""}
+            {productos.length === MAX_RESULTADOS
+              ? " (mostrando los primeros)"
+              : ""}
             .
           </p>
         )}
