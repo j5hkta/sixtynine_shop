@@ -22,10 +22,6 @@ export const CATEGORIAS = [
 
 export type Categoria = (typeof CATEGORIAS)[number];
 
-export function esCategoriaValida(valor: string): valor is Categoria {
-  return (CATEGORIAS as readonly string[]).includes(valor);
-}
-
 /**
  * Slug de URL para una categoría: "Zapatillas" -> "zapatillas".
  *

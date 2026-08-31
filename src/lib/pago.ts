@@ -1,5 +1,3 @@
-import { CATEGORIAS } from "./categorias";
-
 /**
  * Cobro manual repartido entre dos vendedores.
  *
@@ -23,11 +21,6 @@ export const CATEGORIAS_ROPA: readonly string[] = [
   "Gorros",
   "Zapatillas",
 ];
-
-/** Las de skates, derivadas para que no haya dos listas que mantener. */
-export const CATEGORIAS_SKATES: readonly string[] = CATEGORIAS.filter(
-  (categoria) => !CATEGORIAS_ROPA.includes(categoria),
-);
 
 export function vendedorDeCategoria(categoria: string | null): Vendedor {
   return categoria && CATEGORIAS_ROPA.includes(categoria) ? "ropa" : "skates";

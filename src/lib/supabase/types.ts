@@ -218,9 +218,9 @@ export type Database = {
     Views: { [_ in never]: never };
     Functions: {
       /**
-       * Ver `supabase/seguridad_pedidos.sql` y `supabase/envio_schema.sql`.
-       * Devuelve el id del pedido. `p_zona_envio` es 'lima' o 'provincia'; el
-       * costo lo decide la función, no quien la llama.
+       * Ver `supabase/envios_agencia.sql`. Devuelve el id del pedido.
+       * `p_agencia` es 'shalom' u 'olva'; el flete no se cobra en la web, así
+       * que la función siempre guarda `costo_envio = 0`.
        */
       procesar_checkout: {
         Args: {
@@ -235,8 +235,9 @@ export type Database = {
         Returns: string;
       };
       /**
-       * Ver `supabase/consulta_pedido_publico.sql`. Devuelve una fila (o
-       * ninguna). Sólo el importe y el estado: nada del cliente.
+       * Definida en `supabase/consulta_pedido_publico.sql` y redefinida por
+       * `supabase/envios_agencia.sql`, que es la versión vigente. Devuelve una
+       * fila (o ninguna). Nada del cliente: ni nombre, ni DNI, ni teléfono.
        */
       obtener_resumen_pedido: {
         Args: { p_id: string };
@@ -299,16 +300,15 @@ export type Database = {
   };
 };
 
-/** Atajos de tipo para usar en componentes y en el panel administrativo. */
+/**
+ * Atajos de tipo para usar en componentes y en el panel administrativo.
+ *
+ * Sólo los que alguien usa: un atajo sin consumidores es una definición que
+ * nadie revisa cuando cambia el esquema. Añadir los que falten es una línea.
+ */
 export type Producto = Database["public"]["Tables"]["productos"]["Row"];
 export type ProductoInsert =
   Database["public"]["Tables"]["productos"]["Insert"];
 export type ProductoUpdate =
   Database["public"]["Tables"]["productos"]["Update"];
-export type Perfil = Database["public"]["Tables"]["perfiles"]["Row"];
 export type Pedido = Database["public"]["Tables"]["pedidos"]["Row"];
-export type PedidoInsert = Database["public"]["Tables"]["pedidos"]["Insert"];
-export type PedidoItemInsert =
-  Database["public"]["Tables"]["pedidos_items"]["Insert"];
-export type ConfiguracionTienda =
-  Database["public"]["Tables"]["configuracion_tienda"]["Row"];

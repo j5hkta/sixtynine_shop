@@ -124,11 +124,6 @@ function origenPermitido(request: Request): boolean {
  */
 export async function GET(request: Request) {
   if (!origenPermitido(request)) {
-    console.warn(
-      "[reniec] Petición rechazada por origen. origin=%s referer=%s",
-      request.headers.get("origin") ?? "(ninguno)",
-      request.headers.get("referer") ?? "(ninguno)",
-    );
     return Response.json({ ok: false, error: ERROR_GENERICO }, { status: 403 });
   }
 
@@ -147,7 +142,9 @@ export async function GET(request: Request) {
   const ip = ipDelCliente(request) || "desconocida";
 
   if (!(await dentroDelLimite(ip))) {
-    console.warn(`[reniec] Límite superado o no verificable para ${ip}.`);
+    // Sin traza: la IP es un dato personal y el 429 ya queda en el log de
+    // acceso del hosting. Los fallos de la propia comprobación sí se registran,
+    // dentro de `dentroDelLimite()`.
     return Response.json(
       { ok: false, error: "Demasiadas consultas. Inténtalo en un minuto." },
       {

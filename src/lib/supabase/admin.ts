@@ -12,8 +12,9 @@ let cliente: SupabaseClient<Database> | undefined;
 /**
  * Cliente con la `service_role` key: omite RLS por completo.
  *
- * Sólo para procesos sin sesión de usuario, como el webhook de Mercado Pago,
- * que llega desde los servidores de MP y no trae cookies de nadie.
+ * Sólo para procesos sin sesión de usuario. Hoy lo usa `/api/reniec`, que
+ * atiende a visitantes anónimos y necesita escribir en `rate_limits`, una
+ * tabla que ningún cliente puede tocar.
  *
  * PELIGRO: esta clave da acceso total de lectura y escritura a toda la base de
  * datos. Nunca la pongas en una variable `NEXT_PUBLIC_*` ni importes este
