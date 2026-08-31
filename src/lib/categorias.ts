@@ -9,6 +9,7 @@
  */
 export const CATEGORIAS = [
   "Tablas",
+  "Completos",
   "Ruedas",
   "Trucks",
   "Rodamientos",
@@ -17,6 +18,7 @@ export const CATEGORIAS = [
   "Polos",
   "Pantalones",
   "Gorros",
+  "Cascos y Protecciones",
   "Accesorios",
 ] as const;
 

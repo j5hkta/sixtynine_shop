@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { esSeccionValida, type SeccionPortada } from "@/lib/secciones";
 import { archivosDeFormData, subirImagenes } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/server";
 import type {
@@ -44,6 +45,15 @@ function volverConError(destino: string, mensaje: string): never {
   redirect(`${destino}?error=${encodeURIComponent(mensaje)}`);
 }
 
+/**
+ * La portada se arma a partir de `seccion_portada`, asi que crear o editar un
+ * producto puede cambiarla. Sin esto, la franja nueva tardaria hasta 60 s en
+ * aparecer y pareceria que el panel no guardo nada.
+ */
+function refrescarPortada() {
+  revalidatePath("/", "page");
+}
+
 // -----------------------------------------------------------------------------
 // Lectura y validacion de campos
 // -----------------------------------------------------------------------------
@@ -57,6 +67,7 @@ type CamposProducto = {
   stock: number;
   tallas: string[];
   estado: EstadoProducto;
+  seccion_portada: SeccionPortada;
 };
 
 /**
@@ -70,6 +81,7 @@ function leerCampos(formData: FormData, destinoError: string): CamposProducto {
   const precio = Number(texto(formData, "precio"));
   const stock = Number(texto(formData, "stock"));
   const estado = texto(formData, "estado") || "activo";
+  const seccion = texto(formData, "seccion_portada") || "ninguna";
 
   // Campo opcional: vacio significa "sin descuento", no cero. Se distingue
   // antes de convertir, porque `Number("")` es 0 y guardaria un producto
@@ -126,6 +138,11 @@ function leerCampos(formData: FormData, destinoError: string): CamposProducto {
       `Estado inválido: debe ser ${ESTADOS_VALIDOS.join(", ")}.`,
     );
   }
+  // La restriccion `productos_seccion_portada_valida` lo rechazaria igual, pero
+  // con un mensaje de Postgres.
+  if (!esSeccionValida(seccion)) {
+    volverConError(destinoError, "Sección de portada inválida.");
+  }
 
   return {
     titulo,
@@ -136,6 +153,7 @@ function leerCampos(formData: FormData, destinoError: string): CamposProducto {
     stock,
     tallas: listaDeTexto(texto(formData, "tallas")),
     estado: estado as EstadoProducto,
+    seccion_portada: seccion,
   };
 }
 
@@ -186,6 +204,7 @@ export async function crearProducto(formData: FormData) {
   }
 
   revalidatePath(LISTADO);
+  refrescarPortada();
   redirect(LISTADO);
 }
 
@@ -258,6 +277,7 @@ export async function actualizarProducto(formData: FormData) {
 
   revalidatePath(LISTADO);
   revalidatePath(destinoError);
+  refrescarPortada();
   redirect(LISTADO);
 }
 

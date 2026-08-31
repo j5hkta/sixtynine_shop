@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Search, ShoppingBag } from "lucide-react";
 
-import { CATEGORIAS, rutaDeCategoria } from "@/lib/categorias";
+import MenuCategorias from "@/components/tienda/MenuCategorias";
 import { useTotalItems } from "@/store/carrito";
 
 /**
@@ -107,30 +107,8 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* Franja 2: categorías */}
-      <nav aria-label="Categorías" className="border-t border-white/15 bg-black">
-        <ul className="mx-auto flex max-w-7xl items-center gap-5 overflow-x-auto overscroll-x-contain px-3 py-2.5 whitespace-nowrap [-webkit-overflow-scrolling:touch] [scrollbar-width:none] md:gap-6 md:px-6 md:py-3 [&::-webkit-scrollbar]:hidden">
-          <li className="shrink-0">
-            <Link
-              href="/productos"
-              className="text-[11px] font-bold tracking-[0.2em] text-white uppercase underline-offset-4 transition-colors hover:underline"
-            >
-              Todo el catálogo
-            </Link>
-          </li>
-
-          {CATEGORIAS.map((categoria) => (
-            <li key={categoria} className="shrink-0">
-              <Link
-                href={rutaDeCategoria(categoria)}
-                className="text-[11px] font-bold tracking-[0.2em] text-white/70 uppercase underline-offset-4 transition-colors hover:text-white hover:underline"
-              >
-                {categoria}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </nav>
+      {/* Franja 2: categorías agrupadas en desplegables */}
+      <MenuCategorias />
     </header>
   );
 }

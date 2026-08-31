@@ -21,7 +21,7 @@ export default async function EditarProductoPage({
   const { data: producto, error } = await supabase
     .from("productos")
     .select(
-      "id, titulo, descripcion, precio, precio_original, stock, categoria, tallas, imagenes, estado",
+      "id, titulo, descripcion, precio, precio_original, stock, categoria, tallas, imagenes, estado, seccion_portada",
     )
     .eq("id", id)
     .maybeSingle();
@@ -88,6 +88,7 @@ export default async function EditarProductoPage({
           // muestra como casillas para conservar o quitar.
           imagenes: producto.imagenes ?? [],
           estado: producto.estado,
+          seccionPortada: producto.seccion_portada,
         }}
       />
     </div>

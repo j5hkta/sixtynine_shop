@@ -3,6 +3,11 @@ import { ImageUp } from "lucide-react";
 
 import BotonGuardar from "@/components/admin/BotonGuardar";
 import { CATEGORIAS } from "@/lib/categorias";
+import {
+  DATOS_SECCION,
+  SECCIONES_PORTADA,
+  type SeccionPortada,
+} from "@/lib/secciones";
 import type { EstadoProducto } from "@/lib/supabase/types";
 
 const ESTADOS: { valor: EstadoProducto; etiqueta: string; ayuda: string }[] = [
@@ -33,6 +38,7 @@ export type ValoresProducto = {
   /** URLs públicas ya guardadas en el producto. */
   imagenes: string[];
   estado: EstadoProducto;
+  seccionPortada: SeccionPortada;
 };
 
 const VACIO: ValoresProducto = {
@@ -45,6 +51,7 @@ const VACIO: ValoresProducto = {
   tallas: "",
   imagenes: [],
   estado: "activo",
+  seccionPortada: "ninguna",
 };
 
 type ProductoFormProps = {
@@ -213,6 +220,31 @@ export default function ProductoForm({
             ))}
           </select>
         </div>
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="seccion_portada" className={labelClase}>
+          Sección en Portada
+        </label>
+        <select
+          id="seccion_portada"
+          name="seccion_portada"
+          defaultValue={valores.seccionPortada}
+          aria-describedby="seccion-ayuda"
+          className={inputClase}
+        >
+          {SECCIONES_PORTADA.map((seccion) => (
+            <option key={seccion} value={seccion}>
+              {DATOS_SECCION[seccion].etiqueta}
+            </option>
+          ))}
+        </select>
+        <p id="seccion-ayuda" className={ayudaClase}>
+          En qué franja de la página principal aparece el producto. Es
+          independiente de su categoría: puedes poner una tabla en «Completos»
+          si quieres destacarla ahí. Los productos en <code>borrador</code> no
+          salen en la portada aunque tengan sección.
+        </p>
       </div>
 
       <div className="space-y-2">

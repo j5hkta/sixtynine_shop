@@ -20,6 +20,8 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+import type { SeccionPortada } from "@/lib/secciones";
+
 export type EstadoProducto = "activo" | "borrador" | "agotado";
 
 /** Roles de `public.perfiles` (ver `supabase/roles_schema.sql`). */
@@ -46,6 +48,8 @@ export type Database = {
           tallas: string[] | null;
           imagenes: string[] | null;
           estado: EstadoProducto;
+          /** Ver `supabase/secciones_portada.sql`. */
+          seccion_portada: SeccionPortada;
         };
         Insert: {
           id?: string;
@@ -59,6 +63,7 @@ export type Database = {
           tallas?: string[] | null;
           imagenes?: string[] | null;
           estado?: EstadoProducto;
+          seccion_portada?: SeccionPortada;
         };
         Update: {
           id?: string;
@@ -72,6 +77,7 @@ export type Database = {
           tallas?: string[] | null;
           imagenes?: string[] | null;
           estado?: EstadoProducto;
+          seccion_portada?: SeccionPortada;
         };
         Relationships: [];
       };
