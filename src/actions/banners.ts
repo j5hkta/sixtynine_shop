@@ -18,6 +18,10 @@ export type ResultadoBanners =
 
 export type ResultadoBorrado = { ok: true } | { ok: false; error: string };
 
+export type ResultadoEstado =
+  | { exito: true }
+  | { exito: false; error: string };
+
 function texto(formData: FormData, campo: string): string {
   const valor = formData.get(campo);
   return typeof valor === "string" ? valor.trim() : "";
@@ -214,4 +218,55 @@ export async function eliminarBanner(id: string): Promise<ResultadoBorrado> {
 
   refrescarPortada();
   return { ok: true };
+}
+
+/**
+ * Publica u oculta un banner sin borrarlo.
+ *
+ * Un banner oculto sigue en la tabla y en Storage, pero la política de lectura
+ * pública de `supabase/banners.sql` filtra por `activo`, así que desaparece de
+ * la portada para todo el mundo salvo para el panel. Es la vía para preparar
+ * una promoción con antelación o retirar una campaña que quizá vuelva.
+ *
+ * `estadoActual` llega desde el navegador, así que puede venir obsoleto si hay
+ * dos pestañas abiertas: en ese caso el clic escribe el valor contrario al que
+ * el administrador ve. No se corrige leyendo primero la fila porque haría falta
+ * un bloqueo para que sirviera de algo, y la lista se refresca al terminar.
+ */
+export async function alternarEstadoBanner(
+  id: string,
+  estadoActual: boolean,
+): Promise<ResultadoEstado> {
+  if (!id) {
+    return { exito: false, error: "Falta el identificador del banner." };
+  }
+
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("banners")
+    .update({ activo: !estadoActual })
+    .eq("id", id)
+    .select("id");
+
+  if (error) {
+    console.error("[banners] Error al cambiar el estado:", error);
+    return {
+      exito: false,
+      error: `No se pudo cambiar el estado: ${error.message}`,
+    };
+  }
+
+  // Igual que en el resto del panel: un UPDATE que RLS descarta no da error,
+  // devuelve cero filas. Sin esto, una cuenta sin permisos vería el cambio
+  // aplicado en pantalla y nada guardado.
+  if (!data || data.length === 0) {
+    return {
+      exito: false,
+      error: "No se guardó: el banner no existe o tu cuenta no tiene permisos.",
+    };
+  }
+
+  refrescarPortada();
+  return { exito: true };
 }

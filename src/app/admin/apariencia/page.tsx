@@ -7,8 +7,13 @@ import {
   Tag,
 } from "lucide-react";
 
-import { actualizarOrden, crearBanner, obtenerBanners } from "@/actions/banners";
+import {
+  actualizarOrden,
+  crearBanner,
+  obtenerBanners,
+} from "@/actions/banners";
 import BotonEliminarBanner from "@/components/admin/BotonEliminarBanner";
+import BotonEstadoBanner from "@/components/admin/BotonEstadoBanner";
 import BotonGuardar from "@/components/admin/BotonGuardar";
 import { DESTINO_TODO, DESTINOS_BANNER, rutaDeBanner } from "@/lib/banners";
 
@@ -93,82 +98,107 @@ export default async function AparienciaPage({
           </p>
         ) : (
           <ul className="mt-6 space-y-3">
-            {banners.map((banner) => (
-              <li
-                key={banner.id}
-                className="flex flex-col gap-4 border border-ink-line bg-ink p-4 sm:flex-row sm:items-center"
-              >
-                <div className="h-20 w-full shrink-0 overflow-hidden border border-ink-line bg-ink-soft sm:w-36">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={banner.imagen_url}
-                    alt=""
-                    loading="lazy"
-                    className="h-full w-full object-cover"
-                  />
-                </div>
+            {banners.map((banner) => {
+              const etiquetaDestino =
+                banner.categoria === DESTINO_TODO
+                  ? "Todo el catálogo"
+                  : banner.categoria;
 
-                <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 text-sm font-bold text-white">
-                    <Tag className="h-4 w-4 shrink-0 text-neon" aria-hidden />
-                    {banner.categoria === DESTINO_TODO
-                      ? "Todo el catálogo"
-                      : banner.categoria}
-                    {!banner.activo && (
-                      <span className="inline-flex items-center gap-1 border border-ink-line px-2 py-0.5 text-[10px] font-bold tracking-[0.15em] text-neutral-500 uppercase">
-                        <EyeOff className="h-3 w-3" aria-hidden />
-                        Oculto
-                      </span>
-                    )}
-                  </p>
-
-                  <p className="mt-1 font-mono text-xs text-neutral-600">
-                    {rutaDeBanner(banner.categoria)}
-                  </p>
-                </div>
-
-                {/* Un formulario por fila: el id va en el closure del servidor
-                    vía bind, no en un campo que se pueda reescribir. */}
-                <form
-                  action={actualizarOrden.bind(null, banner.id)}
-                  className="flex items-end gap-2"
+              return (
+                <li
+                  key={banner.id}
+                  className={
+                    // La fila oculta se marca con borde discontinuo y fondo
+                    // apagado: hay que poder barrer la lista y ver de un vistazo
+                    // qué está en la portada y qué no.
+                    banner.activo
+                      ? "flex flex-col gap-4 border border-ink-line bg-ink p-4 sm:flex-row sm:items-center"
+                      : "flex flex-col gap-4 border border-dashed border-neutral-600 bg-ink/40 p-4 sm:flex-row sm:items-center"
+                  }
                 >
-                  <div className="space-y-1">
-                    <label
-                      htmlFor={`orden-${banner.id}`}
-                      className="block text-[10px] font-bold tracking-[0.2em] text-neutral-600 uppercase"
-                    >
-                      Orden
-                    </label>
-                    <input
-                      id={`orden-${banner.id}`}
-                      name="orden"
-                      type="number"
-                      min={0}
-                      max={999}
-                      defaultValue={banner.orden}
-                      className="w-20 border border-ink-line bg-ink-soft px-3 py-2 text-sm text-white focus:border-neon focus:outline-none"
+                  <div className="h-20 w-full shrink-0 overflow-hidden border border-ink-line bg-ink-soft sm:w-36">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={banner.imagen_url}
+                      alt=""
+                      loading="lazy"
+                      className={`h-full w-full object-cover ${
+                        banner.activo ? "" : "opacity-40 grayscale"
+                      }`}
                     />
                   </div>
 
-                  <button
-                    type="submit"
-                    className="border border-ink-line px-3 py-2 text-[10px] font-bold tracking-[0.15em] text-neutral-400 uppercase transition-colors hover:border-neon hover:text-neon"
-                  >
-                    Mover
-                  </button>
-                </form>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={`flex items-center gap-2 text-sm font-bold ${
+                        banner.activo ? "text-white" : "text-neutral-500"
+                      }`}
+                    >
+                      <Tag
+                        className={`h-4 w-4 shrink-0 ${
+                          banner.activo ? "text-neon" : "text-neutral-600"
+                        }`}
+                        aria-hidden
+                      />
+                      {etiquetaDestino}
+                      {!banner.activo && (
+                        <span className="inline-flex items-center gap-1 border border-ink-line px-2 py-0.5 text-[10px] font-bold tracking-[0.15em] text-neutral-500 uppercase">
+                          <EyeOff className="h-3 w-3" aria-hidden />
+                          Oculto
+                        </span>
+                      )}
+                    </p>
 
-                <BotonEliminarBanner
-                  id={banner.id}
-                  destino={
-                    banner.categoria === DESTINO_TODO
-                      ? "Todo el catálogo"
-                      : banner.categoria
-                  }
-                />
-              </li>
-            ))}
+                    <p className="mt-1 font-mono text-xs text-neutral-600">
+                      {rutaDeBanner(banner.categoria)}
+                    </p>
+                  </div>
+
+                  {/* Un formulario por fila: el id va en el closure del servidor
+                    vía bind, no en un campo que se pueda reescribir. */}
+                  <form
+                    action={actualizarOrden.bind(null, banner.id)}
+                    className="flex items-end gap-2"
+                  >
+                    <div className="space-y-1">
+                      <label
+                        htmlFor={`orden-${banner.id}`}
+                        className="block text-[10px] font-bold tracking-[0.2em] text-neutral-600 uppercase"
+                      >
+                        Orden
+                      </label>
+                      <input
+                        id={`orden-${banner.id}`}
+                        name="orden"
+                        type="number"
+                        min={0}
+                        max={999}
+                        defaultValue={banner.orden}
+                        className="w-20 border border-ink-line bg-ink-soft px-3 py-2 text-sm text-white focus:border-neon focus:outline-none"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="border border-ink-line px-3 py-2 text-[10px] font-bold tracking-[0.15em] text-neutral-400 uppercase transition-colors hover:border-neon hover:text-neon"
+                    >
+                      Mover
+                    </button>
+                  </form>
+
+                  <BotonEstadoBanner
+                    id={banner.id}
+                    activo={banner.activo}
+                    destino={etiquetaDestino}
+                  />
+
+                  <BotonEliminarBanner
+                    id={banner.id}
+                    destino={etiquetaDestino}
+                  />
+                </li>
+              );
+            })}
           </ul>
         )}
 
@@ -198,7 +228,10 @@ export default async function AparienciaPage({
             htmlFor="imagen_upload"
             className="flex cursor-pointer items-center gap-3 border border-dashed border-ink-line bg-ink px-4 py-5 transition-colors hover:border-neon/50 hover:bg-neon/5"
           >
-            <ImageUp className="h-5 w-5 shrink-0 text-neutral-500" aria-hidden />
+            <ImageUp
+              className="h-5 w-5 shrink-0 text-neutral-500"
+              aria-hidden
+            />
             <span className="text-sm text-neutral-500">
               Selecciona la imagen del banner
             </span>
