@@ -1,71 +1,37 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState } from "react";
 import { AlertTriangle, Loader2, Lock, LogIn, Mail } from "lucide-react";
 
-import { createClient } from "@/lib/supabase/client";
+import { iniciarSesion } from "@/actions/auth";
 
-function mensajeDeError(mensaje: string): string {
-  if (mensaje === "Invalid login credentials") {
-    return "Email o contraseña incorrectos.";
-  }
-  if (mensaje === "Email not confirmed") {
-    return "Debes confirmar tu email antes de ingresar.";
-  }
-  return mensaje;
-}
-
-/** `redirectTo` llega ya saneado desde `src/app/acceso-x69-privado/page.tsx`. */
+/**
+ * Formulario de acceso al panel.
+ *
+ * Envía a una Server Action en lugar de llamar a `signInWithPassword()` desde
+ * el navegador. El motivo es el contador de intentos por IP: hecho en el
+ * cliente, cada intento va directo a Supabase y no hay dónde ponerlo.
+ *
+ * Como es un `<form action={...}>` de verdad, funciona incluso antes de que
+ * hidrate el JavaScript.
+ *
+ * `redirectTo` llega ya saneado desde `src/app/acceso-x69-privado/page.tsx`, y
+ * la acción lo vuelve a validar porque el campo oculto es reescribible.
+ */
 export default function LoginForm({ redirectTo }: { redirectTo: string }) {
-  const router = useRouter();
-
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError(null);
-    setLoading(true);
-
-    try {
-      const supabase = createClient();
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-
-      if (signInError) {
-        setError(mensajeDeError(signInError.message));
-        setLoading(false);
-        return;
-      }
-
-      // `refresh()` obliga a los Server Components a releer la cookie de sesión
-      // recién escrita; sin esto el panel podría renderizarse aún sin usuario.
-      router.replace(redirectTo);
-      router.refresh();
-    } catch (unknownError) {
-      setError(
-        unknownError instanceof Error
-          ? unknownError.message
-          : "No se pudo conectar con Supabase.",
-      );
-      setLoading(false);
-    }
-  }
+  const [estado, enviar, pendiente] = useActionState(iniciarSesion, undefined);
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      {error && (
+    <form action={enviar} className="space-y-5">
+      <input type="hidden" name="redirectTo" value={redirectTo} />
+
+      {estado?.error && (
         <p
           role="alert"
           className="flex items-start gap-2 border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300"
         >
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-          {error}
+          {estado.error}
         </p>
       )}
 
@@ -87,8 +53,7 @@ export default function LoginForm({ redirectTo }: { redirectTo: string }) {
             type="email"
             required
             autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            maxLength={160}
             placeholder="admin@sixtynine.pe"
             className="w-full border border-ink-line bg-ink-soft py-3 pr-4 pl-10 text-sm text-white transition-colors placeholder:text-neutral-600 focus:border-neon focus:outline-none"
           />
@@ -113,8 +78,7 @@ export default function LoginForm({ redirectTo }: { redirectTo: string }) {
             type="password"
             required
             autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            maxLength={200}
             placeholder="••••••••"
             className="w-full border border-ink-line bg-ink-soft py-3 pr-4 pl-10 text-sm text-white transition-colors placeholder:text-neutral-600 focus:border-neon focus:outline-none"
           />
@@ -123,10 +87,10 @@ export default function LoginForm({ redirectTo }: { redirectTo: string }) {
 
       <button
         type="submit"
-        disabled={loading}
+        disabled={pendiente}
         className="flex w-full items-center justify-center gap-2 bg-neon py-3.5 text-sm font-black tracking-[0.15em] text-ink uppercase transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {loading ? (
+        {pendiente ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
             Verificando...

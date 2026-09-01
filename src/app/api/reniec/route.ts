@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/admin";
+import { comprobarLimite, ipDeCabeceras } from "@/lib/rate-limit";
 
 const API_BASE =
   process.env.APIS_PERU_URL ?? "https://apisperu.com/api/v1/dni";
@@ -8,53 +8,6 @@ const ERROR_GENERICO = "No se pudo consultar el DNI.";
 
 const MAX_PETICIONES = 5;
 const VENTANA_SEGUNDOS = 60;
-
-/**
- * IP del cliente.
- *
- * `x-forwarded-for` puede traer una cadena («cliente, proxy1, proxy2»); la
- * primera entrada es el cliente original. Ojo: esa cabecera la puede falsear
- * quien llame directamente al servidor, así que esto sólo es fiable si delante
- * hay un proxy que la reescribe (Vercel, nginx, Cloudflare lo hacen).
- */
-function ipDelCliente(request: Request): string {
-  const reenviada = request.headers.get("x-forwarded-for");
-  if (reenviada) {
-    const primera = reenviada.split(",")[0]?.trim();
-    if (primera) return primera;
-  }
-
-  return request.headers.get("x-real-ip")?.trim() ?? "";
-}
-
-/**
- * Cuenta la petición y dice si se permite.
- *
- * Falla CERRADO: si no se puede comprobar el límite (falta la service_role key,
- * la base no responde, no se ejecutó `rate_limit.sql`), se rechaza. Un control
- * de abuso que se desactiva solo cuando algo va mal no protege nada, y el coste
- * aquí es sólo que el comprador escriba su nombre a mano.
- */
-async function dentroDelLimite(ip: string): Promise<boolean> {
-  try {
-    const supabase = createAdminClient();
-    const { data, error } = await supabase.rpc("verificar_rate_limit", {
-      p_ip: ip,
-      p_max: MAX_PETICIONES,
-      p_ventana_segundos: VENTANA_SEGUNDOS,
-    });
-
-    if (error) {
-      console.error("[reniec] No se pudo verificar el rate limit:", error);
-      return false;
-    }
-
-    return data === true;
-  } catch (e) {
-    console.error("[reniec] Rate limit no disponible:", e);
-    return false;
-  }
-}
 
 function esHostLocal(hostname: string): boolean {
   return (
@@ -139,12 +92,14 @@ export async function GET(request: Request) {
   // Se cuenta después de validar el formato para no gastar cupo en peticiones
   // que nunca habrían llegado a la API externa. Sin IP identificable, todas
   // esas peticiones comparten un mismo cubo en vez de quedar sin contar.
-  const ip = ipDelCliente(request) || "desconocida";
+  const ip = ipDeCabeceras(request.headers);
 
-  if (!(await dentroDelLimite(ip))) {
+  // Falla CERRADO: si no se puede comprobar el limite, se rechaza. Lo que se
+  // pierde es que el comprador escriba su nombre a mano.
+  if ((await comprobarLimite("reniec", ip, MAX_PETICIONES, VENTANA_SEGUNDOS)) !== "permitido") {
     // Sin traza: la IP es un dato personal y el 429 ya queda en el log de
     // acceso del hosting. Los fallos de la propia comprobación sí se registran,
-    // dentro de `dentroDelLimite()`.
+    // dentro de `comprobarLimite()`.
     return Response.json(
       { ok: false, error: "Demasiadas consultas. Inténtalo en un minuto." },
       {

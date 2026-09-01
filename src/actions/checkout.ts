@@ -1,53 +1,90 @@
 "use server";
 
-import { esAgenciaValida } from "@/lib/envio";
+import { headers } from "next/headers";
+
+import { z } from "zod";
+
+import { CLAVES_AGENCIA } from "@/lib/envio";
+import { comprobarLimite, ipDeCabeceras } from "@/lib/rate-limit";
 import { createClient } from "@/lib/supabase/server";
+import { primerError, sinEtiquetas, textoCorto } from "@/lib/validacion";
 import type { ItemCarrito } from "@/store/carrito";
 
 export type ResultadoPedido =
   | { exito: true; pedidoId: string }
   | { exito: false; error: string };
 
-function texto(formData: FormData, campo: string): string {
-  const valor = formData.get(campo);
-  return typeof valor === "string" ? valor.trim() : "";
-}
+/**
+ * Cupo de pedidos por IP.
+ *
+ * Generoso a propósito: un comprador real puede reintentar tres o cuatro veces
+ * si se le agota el stock de algo. Lo que corta es el bucle automatizado, que
+ * en cada vuelta bloquea filas de `productos` y descuenta inventario.
+ */
+const MAX_PEDIDOS = 10;
+const VENTANA_SEGUNDOS = 600;
 
-type DatosCliente = {
-  nombre: string;
-  dni: string;
-  telefono: string;
-  direccion: string;
-};
+/** Tope de líneas por pedido. Cada una toma un `FOR UPDATE` en la base. */
+const MAX_LINEAS = 50;
+
+/** Tope de unidades por línea. */
+const MAX_UNIDADES = 99;
 
 /**
- * Validacion en el servidor de Next, para dar un mensaje util sin gastar un
- * viaje a la base de datos. `procesar_checkout()` repite estas mismas reglas:
- * esta capa es comodidad, la de Postgres es la que manda.
+ * Datos del comprador.
+ *
+ * Esta capa da un mensaje útil sin gastar un viaje a la base de datos;
+ * `procesar_checkout()` repite las mismas reglas y es la que manda.
  */
-function validarCliente(formData: FormData): DatosCliente | string {
-  const nombre = texto(formData, "nombre");
-  const dni = texto(formData, "dni");
-  const telefono = texto(formData, "telefono").replace(/\s+/g, "");
-  const direccion = texto(formData, "direccion");
+const esquemaCliente = z.object({
+  nombre: sinEtiquetas(120).pipe(
+    z.string().min(3, "ingresa tu nombre completo"),
+  ),
+  dni: textoCorto(8).pipe(
+    z.string().regex(/^\d{8}$/, "debe tener exactamente 8 dígitos"),
+  ),
+  telefono: z
+    .string()
+    .transform((valor) => valor.replace(/\s+/g, ""))
+    .pipe(
+      z
+        .string()
+        .regex(/^9\d{8}$/, "debe ser un celular peruano de 9 dígitos que empiece en 9"),
+    ),
+  // Sólo ciudad o distrito: la dirección exacta la pone la agencia, así que
+  // "Lima" es una respuesta perfectamente válida.
+  direccion: sinEtiquetas(120).pipe(
+    z.string().min(3, "ingresa tu ciudad o distrito"),
+  ),
+  agencia: z.enum(CLAVES_AGENCIA as [string, ...string[]], {
+    message: "selecciona una agencia de envío",
+  }),
+  sede_agencia: sinEtiquetas(160).pipe(
+    z
+      .string()
+      .min(3, "indica la sede de la agencia donde recogerás el pedido"),
+  ),
+});
 
-  if (nombre.length < 3) {
-    return "Ingresa tu nombre completo.";
-  }
-  if (!/^\d{8}$/.test(dni)) {
-    return "El DNI debe tener exactamente 8 dígitos.";
-  }
-  if (!/^9\d{8}$/.test(telefono)) {
-    return "El teléfono debe ser un celular peruano de 9 dígitos que empiece en 9.";
-  }
-  // Solo ciudad o distrito: la direccion exacta la pone la agencia, asi que
-  // "Lima" es una respuesta perfectamente valida.
-  if (direccion.length < 3) {
-    return "Ingresa tu ciudad o distrito.";
-  }
-
-  return { nombre, dni, telefono, direccion };
-}
+/**
+ * Carrito.
+ *
+ * Llega del `localStorage` del navegador, es decir, de un sitio que el visitante
+ * controla por completo: se acepta *qué* producto, *qué* talla y *cuántas*
+ * unidades, y nada más. El precio que traiga se descarta —lo relee
+ * `procesar_checkout()` de la base— y los topes evitan que un cuerpo con diez
+ * mil líneas ponga a la base a tomar diez mil bloqueos de fila.
+ */
+const esquemaCarrito = z
+  .array(
+    z.object({
+      id_producto: z.uuid("identificador de producto no válido"),
+      cantidad: z.coerce.number().int().min(1).max(MAX_UNIDADES),
+      talla: textoCorto(20).nullish().default(null),
+    }),
+  )
+  .min(1, "tu carrito está vacío")
+  .max(MAX_LINEAS, `no se admiten más de ${MAX_LINEAS} líneas por pedido`);
 
 /**
  * Registra el pedido y devuelve su identificador.
@@ -69,48 +106,55 @@ export async function procesarPedido(
   formData: FormData,
   carrito: ItemCarrito[],
 ): Promise<ResultadoPedido> {
-  const cliente = validarCliente(formData);
-  if (typeof cliente === "string") {
-    return { exito: false, error: cliente };
+  const cliente = esquemaCliente.safeParse(
+    Object.fromEntries(formData.entries()),
+  );
+
+  if (!cliente.success) {
+    return { exito: false, error: primerError(cliente.error) };
   }
 
-  const agencia = texto(formData, "agencia");
-  if (!esAgenciaValida(agencia)) {
-    return { exito: false, error: "Selecciona una agencia de envío." };
+  const lineas = esquemaCarrito.safeParse(carrito);
+
+  if (!lineas.success) {
+    return { exito: false, error: primerError(lineas.error) };
   }
 
-  const sede = texto(formData, "sede_agencia");
-  if (sede.length < 3) {
+  // Falla ABIERTO a propósito: si el limitador no responde (falta la
+  // `service_role` key, la base tose), cerrar aquí significaría que la tienda
+  // deja de vender. La protección real contra el abuso sigue siendo
+  // `procesar_checkout()`, que bloquea las filas y valida el stock.
+  const limite = await comprobarLimite(
+    "checkout",
+    ipDeCabeceras(await headers()),
+    MAX_PEDIDOS,
+    VENTANA_SEGUNDOS,
+  );
+
+  if (limite === "excedido") {
     return {
       exito: false,
-      error: "Indica la sede de la agencia donde recogerás el pedido.",
+      error:
+        "Has hecho demasiados pedidos seguidos. Espera unos minutos o escríbenos por WhatsApp.",
     };
   }
 
-  if (!Array.isArray(carrito) || carrito.length === 0) {
-    return { exito: false, error: "Tu carrito está vacío." };
-  }
-
-  const items = carrito.map((item) => ({
-    producto_id: String(item.id_producto),
-    cantidad: Math.trunc(Number(item.cantidad)),
-    talla: item.talla ? String(item.talla) : null,
+  const items = lineas.data.map((item) => ({
+    producto_id: item.id_producto,
+    cantidad: item.cantidad,
+    talla: item.talla,
   }));
-
-  if (items.some((i) => !Number.isInteger(i.cantidad) || i.cantidad <= 0)) {
-    return { exito: false, error: "Alguna cantidad del carrito no es válida." };
-  }
 
   const supabase = await createClient();
 
   const { data: pedidoId, error } = await supabase.rpc("procesar_checkout", {
-    p_cliente_nombre: cliente.nombre,
-    p_cliente_telefono: cliente.telefono,
-    p_cliente_dni: cliente.dni,
-    p_direccion_envio: cliente.direccion,
+    p_cliente_nombre: cliente.data.nombre,
+    p_cliente_telefono: cliente.data.telefono,
+    p_cliente_dni: cliente.data.dni,
+    p_direccion_envio: cliente.data.direccion,
     p_items: items,
-    p_agencia: agencia,
-    p_sede_agencia: sede,
+    p_agencia: cliente.data.agencia,
+    p_sede_agencia: cliente.data.sede_agencia,
   });
 
   if (error) {

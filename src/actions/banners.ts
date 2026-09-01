@@ -3,10 +3,37 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { esDestinoValido } from "@/lib/banners";
+import { z } from "zod";
+
+import { DESTINO_TODO, esDestinoValido } from "@/lib/banners";
 import { archivosDeFormData, subirImagenes } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
+import { entero, primerError, textoCorto } from "@/lib/validacion";
+
+/** Posición máxima. Las franjas se ordenan por este número. */
+const ORDEN_MAXIMO = 999;
+
+/**
+ * Esquema del alta de banner.
+ *
+ * `categoria` se valida contra `CATEGORIAS` mediante `esDestinoValido`, no con
+ * un `z.enum` escrito aquí: la lista viva está en `src/lib/categorias.ts` y
+ * duplicarla sería la clase de lista doble que acaba desincronizada.
+ */
+const esquemaBanner = z.object({
+  categoria: textoCorto(60)
+    .default(DESTINO_TODO)
+    .refine(esDestinoValido, { message: "destino no válido" }),
+  orden: z
+    .union([z.literal(""), entero(ORDEN_MAXIMO)])
+    .optional()
+    .default(0)
+    .transform((valor) => (valor === "" ? 0 : valor)),
+});
+
+/** Sólo el orden; el id viaja por `bind`, fuera del formulario. */
+const esquemaOrden = z.object({ orden: entero(ORDEN_MAXIMO) });
 
 const PANEL = "/admin/apariencia";
 
@@ -21,11 +48,6 @@ export type ResultadoBorrado = { ok: true } | { ok: false; error: string };
 export type ResultadoEstado =
   | { exito: true }
   | { exito: false; error: string };
-
-function texto(formData: FormData, campo: string): string {
-  const valor = formData.get(campo);
-  return typeof valor === "string" ? valor.trim() : "";
-}
 
 function volverConError(mensaje: string): never {
   redirect(`${PANEL}?error=${encodeURIComponent(mensaje)}`);
@@ -78,18 +100,15 @@ export async function obtenerBanners(): Promise<ResultadoBanners> {
  * formatos, el límite de 5 MB y la deduplicación por hash de contenido.
  */
 export async function crearBanner(formData: FormData) {
-  const categoria = texto(formData, "categoria");
+  const validado = esquemaBanner.safeParse(
+    Object.fromEntries(formData.entries()),
+  );
 
-  if (!esDestinoValido(categoria)) {
-    volverConError("Elige un destino válido para el banner.");
+  if (!validado.success) {
+    volverConError(primerError(validado.error));
   }
 
-  // Un `orden` ilegible no debe abortar el alta: 0 lo deja al principio y se
-  // corrige desde la lista en un segundo.
-  const ordenCrudo = Number.parseInt(texto(formData, "orden"), 10);
-  const orden = Number.isFinite(ordenCrudo)
-    ? Math.min(Math.max(ordenCrudo, 0), 999)
-    : 0;
+  const { categoria, orden } = validado.data;
 
   const archivos = archivosDeFormData(formData, "imagen_upload");
 
@@ -141,17 +160,19 @@ export async function crearBanner(formData: FormData) {
  * cualquiera podría reescribir.
  */
 export async function actualizarOrden(id: string, formData: FormData) {
-  if (!id) {
+  if (!z.uuid().safeParse(id).success) {
     volverConError("Falta el identificador del banner.");
   }
 
-  const ordenCrudo = Number.parseInt(texto(formData, "orden"), 10);
+  const validado = esquemaOrden.safeParse(
+    Object.fromEntries(formData.entries()),
+  );
 
-  if (!Number.isFinite(ordenCrudo)) {
-    volverConError("El orden debe ser un número.");
+  if (!validado.success) {
+    volverConError(`El orden ${primerError(validado.error)}.`);
   }
 
-  const orden = Math.min(Math.max(ordenCrudo, 0), 999);
+  const { orden } = validado.data;
 
   const supabase = await createClient();
 
@@ -190,7 +211,7 @@ export async function actualizarOrden(id: string, formData: FormData) {
  * objeto: borrarlo aquí dejaría la ficha del producto sin foto.
  */
 export async function eliminarBanner(id: string): Promise<ResultadoBorrado> {
-  if (!id) {
+  if (!z.uuid().safeParse(id).success) {
     return { ok: false, error: "Falta el identificador del banner." };
   }
 
@@ -237,7 +258,7 @@ export async function alternarEstadoBanner(
   id: string,
   estadoActual: boolean,
 ): Promise<ResultadoEstado> {
-  if (!id) {
+  if (!z.uuid().safeParse(id).success) {
     return { exito: false, error: "Falta el identificador del banner." };
   }
 

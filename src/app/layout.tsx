@@ -96,9 +96,23 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
+    /*
+     * `overflow-x-hidden` va en <html> y NO en <body>, a propósito.
+     *
+     * El overflow del elemento raíz se propaga al viewport, así que puesto aquí
+     * recorta el scroll horizontal sin convertir a nadie en contenedor de
+     * scroll. Puesto en <body>, en cambio, body sí pasa a ser contenedor de
+     * scroll (al no ser `visible` en un eje, el otro pasa a `auto`), y entonces
+     * el Navbar `sticky top-0` de la tienda se ancla al scrollport de body en
+     * lugar de al viewport: dejaría de quedarse fijo al bajar.
+     *
+     * Es una red de seguridad, no el arreglo. Lo que desbordaba en el carrito
+     * está corregido en su sitio; esto sólo evita que un descuadre futuro se
+     * traduzca en una franja blanca a la derecha.
+     */
     <html
       lang="es"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full overflow-x-hidden antialiased`}
     >
       {/* La barra de progreso ya no vive aquí: cada zona monta la suya con su
           propio color (negra en la tienda, neón en el panel), porque una única

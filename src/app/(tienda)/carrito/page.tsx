@@ -190,11 +190,11 @@ function LineaCarrito({
   const enMaximo = item.cantidad >= CANTIDAD_MAXIMA;
 
   return (
-    <li className="flex gap-4 border border-neutral-200 bg-white p-4 transition-colors hover:border-black">
+    <li className="flex gap-3 border border-neutral-200 bg-white p-3 transition-colors hover:border-black sm:gap-4 sm:p-4">
       {/* Miniatura */}
       <Link
         href={`/productos/${item.id_producto}`}
-        className="h-24 w-24 shrink-0 overflow-hidden border border-neutral-200 bg-white"
+        className="h-20 w-20 shrink-0 overflow-hidden border border-neutral-200 bg-white sm:h-24 sm:w-24"
         aria-hidden
         tabIndex={-1}
       >
@@ -215,12 +215,22 @@ function LineaCarrito({
 
       {/* Datos */}
       <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <Link
-          href={`/productos/${item.id_producto}`}
-          className="truncate text-sm font-bold text-black transition-colors hover:text-black"
-        >
-          {item.titulo}
-        </Link>
+        {/* El total de la línea vive aquí dentro, no como tercera columna del
+            `li`. Como columna sumaba ~106 px irreducibles (importe + hueco) al
+            ancho mínimo de la fila, y era lo que empujaba la página fuera de
+            la pantalla en cualquier móvil. */}
+        <div className="flex items-start justify-between gap-3">
+          <Link
+            href={`/productos/${item.id_producto}`}
+            className="line-clamp-2 min-w-0 text-sm font-bold break-words text-black transition-colors hover:text-black"
+          >
+            {item.titulo}
+          </Link>
+
+          <p className="shrink-0 font-mono text-base font-black whitespace-nowrap text-black">
+            {moneda.format(item.precio * item.cantidad)}
+          </p>
+        </div>
 
         {item.talla && (
           <p className="text-[11px] font-bold tracking-[0.15em] text-neutral-500 uppercase">
@@ -233,8 +243,9 @@ function LineaCarrito({
           <span className="font-mono">{moneda.format(item.precio)}</span> c/u
         </p>
 
-        {/* Cantidad */}
-        <div className="mt-auto flex items-center gap-3 pt-3">
+        {/* Cantidad. `flex-wrap` + `min-w-0`: si no cabe, la papelera baja a
+            la línea siguiente en vez de desbordar la tarjeta. */}
+        <div className="mt-auto flex min-w-0 flex-wrap items-center gap-2 pt-3 sm:gap-3">
           <div className="flex items-center border border-neutral-200">
             <button
               type="button"
@@ -275,11 +286,6 @@ function LineaCarrito({
           </button>
         </div>
       </div>
-
-      {/* Total de la línea */}
-      <p className="shrink-0 self-start font-mono text-base font-black whitespace-nowrap text-black">
-        {moneda.format(item.precio * item.cantidad)}
-      </p>
     </li>
   );
 }

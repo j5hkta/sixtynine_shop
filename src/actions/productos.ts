@@ -3,43 +3,26 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
-import { esSeccionValida, type SeccionPortada } from "@/lib/secciones";
+import { z } from "zod";
+
+import { SECCIONES_PORTADA } from "@/lib/secciones";
 import { archivosDeFormData, subirImagenes } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/server";
-import type {
-  EstadoProducto,
-  ProductoInsert,
-  ProductoUpdate,
-} from "@/lib/supabase/types";
+import type { ProductoInsert, ProductoUpdate } from "@/lib/supabase/types";
+import {
+  entero,
+  importe,
+  limpiarControl,
+  primerError,
+  textoCorto,
+  textoLargo,
+} from "@/lib/validacion";
 
 const LISTADO = "/admin/productos";
 const FORMULARIO_NUEVO = "/admin/productos/nuevo";
 
-const ESTADOS_VALIDOS: readonly EstadoProducto[] = [
-  "activo",
-  "borrador",
-  "agotado",
-];
-
-/** Devuelve el texto de un campo del formulario, o "" si no vino. */
-function texto(formData: FormData, campo: string): string {
-  const valor = formData.get(campo);
-  return typeof valor === "string" ? valor.trim() : "";
-}
-
-/**
- * Convierte "S, M, L" en ["S", "M", "L"].
- *
- * El `filter(Boolean)` no es opcional: sin el, un campo vacio produce [""] y
- * el producto quedaria con una talla fantasma en la base de datos. Tambien
- * limpia las comas de mas ("S, , L") y la coma final.
- */
-function listaDeTexto(valor: string): string[] {
-  return valor
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
+/** Tope de unidades por producto. Muy por encima de lo real, pero acotado. */
+const STOCK_MAXIMO = 100_000;
 
 function volverConError(destino: string, mensaje: string): never {
   redirect(`${destino}?error=${encodeURIComponent(mensaje)}`);
@@ -67,103 +50,88 @@ function refrescarTiendaPublica() {
 // Lectura y validacion de campos
 // -----------------------------------------------------------------------------
 
-type CamposProducto = {
-  titulo: string;
-  descripcion: string | null;
-  categoria: string | null;
-  precio: number;
-  precio_original: number | null;
-  stock: number;
-  tallas: string[];
-  estado: EstadoProducto;
-  seccion_portada: SeccionPortada;
-};
+/**
+ * Esquema del formulario de producto.
+ *
+ * Todo lo que llega de `FormData` es texto, así que los números se convierten
+ * con `coerce` y los enumerados se cierran con `z.enum`: un `estado` inventado
+ * por consola ya no llega a la base de datos.
+ *
+ * `categoria` acepta también la cadena vacía y cualquier valor fuera de
+ * `CATEGORIAS`, a propósito. El formulario conserva como opción la categoría
+ * que ya tuviera un producto aunque se haya retirado de la lista (los que se
+ * quedaron en «Polerones»); cerrarla aquí reasignaría esos productos en
+ * silencio la próxima vez que alguien los editara.
+ */
+const esquemaProducto = z
+  .object({
+    titulo: textoCorto(120).pipe(z.string().min(1, "el título es obligatorio")),
+    // Texto libre y largo. No se le aplica `sinEtiquetas`: las descripciones
+    // llevan medidas con comillas y rangos con signos de menor/mayor.
+    descripcion: textoLargo(4000).optional().default(""),
+    categoria: textoCorto(60).optional().default(""),
+    precio: importe(),
+    // Vacío significa «sin descuento», no cero: `Number("")` es 0 y guardaría
+    // un producto rebajado desde S/ 0.00.
+    precio_original: z
+      .union([z.literal(""), importe()])
+      .optional()
+      .default("")
+      .transform((valor) => (valor === "" ? null : valor)),
+    stock: entero(STOCK_MAXIMO),
+    tallas: z
+      .string()
+      .optional()
+      .default("")
+      .transform((valor) =>
+        limpiarControl(valor)
+          .split(",")
+          .map((talla) => talla.trim())
+          // Sin el filtro, un campo vacío produce [""] y el producto queda con
+          // una talla fantasma. También limpia "S, , L" y la coma final.
+          .filter(Boolean)
+          .slice(0, 30)
+          .map((talla) => talla.slice(0, 20)),
+      ),
+    estado: z.enum(["activo", "borrador", "agotado"]).optional().default("activo"),
+    seccion_portada: z.enum(SECCIONES_PORTADA).optional().default("ninguna"),
+  })
+  .refine(
+    (campos) =>
+      campos.precio_original === null || campos.precio_original > campos.precio,
+    {
+      path: ["precio_original"],
+      message:
+        "debe ser mayor que el precio actual; si el producto no está rebajado, déjalo vacío",
+    },
+  )
+  .transform((campos) => ({
+    ...campos,
+    descripcion: campos.descripcion || null,
+    categoria: campos.categoria || null,
+  }));
+
+type CamposProducto = z.output<typeof esquemaProducto>;
 
 /**
  * Lee y valida los campos comunes al alta y la edicion.
- * Ante un valor invalido no retorna: redirige a `destinoError`.
+ *
+ * Ante un valor invalido no retorna: redirige a `destinoError`. La comparacion
+ * entre precio y precio original se hace sobre los valores ya redondeados a dos
+ * decimales (lo hace `importe()`), porque las columnas son `numeric(10,2)`: dos
+ * cifras que solo se distinguieran en el tercer decimal pasarian la validacion
+ * y chocarian despues contra la restriccion de la base, ya iguales.
  */
 function leerCampos(formData: FormData, destinoError: string): CamposProducto {
-  const titulo = texto(formData, "titulo");
-  const descripcion = texto(formData, "descripcion");
-  const categoria = texto(formData, "categoria");
-  const precio = Number(texto(formData, "precio"));
-  const stock = Number(texto(formData, "stock"));
-  const estado = texto(formData, "estado") || "activo";
-  const seccion = texto(formData, "seccion_portada") || "ninguna";
+  const resultado = esquemaProducto.safeParse(
+    Object.fromEntries(formData.entries()),
+  );
 
-  // Campo opcional: vacio significa "sin descuento", no cero. Se distingue
-  // antes de convertir, porque `Number("")` es 0 y guardaria un producto
-  // rebajado desde S/ 0.00.
-  const precioOriginalTexto = texto(formData, "precio_original");
-  const precioOriginal =
-    precioOriginalTexto === "" ? null : Number(precioOriginalTexto);
-
-  if (!titulo) {
-    volverConError(destinoError, "El título es obligatorio.");
-  }
-  if (!Number.isFinite(precio) || precio < 0) {
-    volverConError(
-      destinoError,
-      "El precio debe ser un número mayor o igual a 0.",
-    );
-  }
-  // Ambas columnas son numeric(10,2). Se redondea ANTES de comparar: dos
-  // valores que sólo se distinguen en el tercer decimal pasarian la validacion
-  // y luego chocarian contra la restriccion de la base ya redondeados a lo
-  // mismo.
-  const precioRedondeado = Math.round(precio * 100) / 100;
-  const precioOriginalRedondeado =
-    precioOriginal === null ? null : Math.round(precioOriginal * 100) / 100;
-
-  if (precioOriginalRedondeado !== null) {
-    if (
-      !Number.isFinite(precioOriginalRedondeado) ||
-      precioOriginalRedondeado <= 0
-    ) {
-      volverConError(
-        destinoError,
-        "El precio original debe ser un número mayor que 0, o quedar vacío.",
-      );
-    }
-    // La restriccion `productos_precio_original_coherente` rechazaria esto en
-    // la base, pero con un mensaje de Postgres que no ayuda a nadie.
-    if (precioOriginalRedondeado <= precioRedondeado) {
-      volverConError(
-        destinoError,
-        "El precio original debe ser mayor que el precio actual. Si el producto no está rebajado, deja el campo vacío.",
-      );
-    }
-  }
-  if (!Number.isInteger(stock) || stock < 0) {
-    volverConError(
-      destinoError,
-      "El stock debe ser un número entero mayor o igual a 0.",
-    );
-  }
-  if (!ESTADOS_VALIDOS.includes(estado as EstadoProducto)) {
-    volverConError(
-      destinoError,
-      `Estado inválido: debe ser ${ESTADOS_VALIDOS.join(", ")}.`,
-    );
-  }
-  // La restriccion `productos_seccion_portada_valida` lo rechazaria igual, pero
-  // con un mensaje de Postgres.
-  if (!esSeccionValida(seccion)) {
-    volverConError(destinoError, "Sección de portada inválida.");
+  if (!resultado.success) {
+    volverConError(destinoError, primerError(resultado.error));
   }
 
-  return {
-    titulo,
-    descripcion: descripcion || null,
-    categoria: categoria || null,
-    precio: precioRedondeado,
-    precio_original: precioOriginalRedondeado,
-    stock,
-    tallas: listaDeTexto(texto(formData, "tallas")),
-    estado: estado as EstadoProducto,
-    seccion_portada: seccion,
-  };
+  return resultado.data;
 }
 
 function mensajeDeErrorSupabase(code: string, message: string, verbo: string) {
@@ -225,11 +193,15 @@ export async function crearProducto(formData: FormData) {
  * del producto, pero el objeto permanece en el bucket.
  */
 export async function actualizarProducto(formData: FormData) {
-  const id = texto(formData, "id");
+  // Se exige UUID, no "una cadena cualquiera": un `id` con otro formato hace
+  // fallar la consulta con 22P02, y validarlo aqui evita el viaje a la base.
+  const idValidado = z.uuid().safeParse(formData.get("id"));
 
-  if (!id) {
+  if (!idValidado.success) {
     volverConError(LISTADO, "Falta el identificador del producto a editar.");
   }
+
+  const id = idValidado.data;
 
   const destinoError = `${LISTADO}/${id}`;
   const campos = leerCampos(formData, destinoError);
@@ -249,9 +221,17 @@ export async function actualizarProducto(formData: FormData) {
 
   const conservadas = formData
     .getAll("imagenes_actuales")
+    // Las casillas devuelven las URLs que el propio formulario pintó, pero la
+    // acción es un endpoint público: nada impide enviar aquí un enlace a otro
+    // dominio y dejar la ficha del producto cargando imágenes de un tercero
+    // que vería la IP de cada visitante. Se exige https y se acota el número.
     .filter(
-      (valor): valor is string => typeof valor === "string" && valor !== "",
-    );
+      (valor): valor is string =>
+        typeof valor === "string" &&
+        valor.startsWith("https://") &&
+        valor.length <= 500,
+    )
+    .slice(0, 20);
 
   // `Set` evita repetir una URL si la imagen ya estaba y se vuelve a subir:
   // como el nombre del objeto es el hash del contenido, la URL es la misma.
@@ -307,7 +287,7 @@ export type ResultadoBorrado = { ok: true } | { ok: false; error: string };
  * retorno viaja intacto.
  */
 export async function eliminarProducto(id: string): Promise<ResultadoBorrado> {
-  if (!id) {
+  if (!z.uuid().safeParse(id).success) {
     return { ok: false, error: "Falta el identificador del producto." };
   }
 

@@ -1,7 +1,9 @@
+import { headers } from "next/headers";
 import Link from "next/link";
 import { AlertTriangle, SearchX } from "lucide-react";
 
 import ProductCard from "@/components/tienda/ProductCard";
+import { comprobarLimite, ipDeCabeceras } from "@/lib/rate-limit";
 import { createAnonClient } from "@/lib/supabase/anon";
 
 export const metadata = {
@@ -11,6 +13,21 @@ export const metadata = {
 
 const MIN_CARACTERES = 2;
 const MAX_RESULTADOS = 60;
+
+/**
+ * Cupo de búsquedas por IP.
+ *
+ * Alto a propósito. Es el único punto de lectura pública sin caché —el resto
+ * del catálogo se sirve con ISR y no toca Supabase en cada visita—, así que un
+ * bucle aquí sí consume cuota de lectura. Treinta por minuto no las alcanza
+ * nadie tecleando, y un raspador queda cortado en dos segundos.
+ *
+ * Ojo al coste: la comprobación es en sí misma una escritura en la base. Con
+ * este umbral sólo se paga en búsquedas reales, que son pocas, y a cambio se
+ * acota el peor caso, que era ilimitado.
+ */
+const MAX_BUSQUEDAS = 30;
+const VENTANA_SEGUNDOS = 60;
 
 /**
  * Prepara el término para `ilike`.
@@ -59,9 +76,28 @@ export default async function BuscarPage({
   const termino = limpiarTermino(crudo);
   const consultaValida = termino.length >= MIN_CARACTERES;
 
-  const { productos, error } = consultaValida
-    ? await buscarProductos(termino)
-    : { productos: [], error: null };
+  // Se comprueba sólo cuando la consulta iba a llegar a la base: escribir en
+  // `rate_limits` por cada visita a /buscar sin término sería pagar el coste
+  // sin evitar ninguna lectura.
+  //
+  // Falla ABIERTO: si el limitador no responde, se busca igual. Dejar el
+  // buscador de la tienda inservible porque falta una variable de entorno es
+  // peor que la lectura de más que se quería ahorrar.
+  const limite = consultaValida
+    ? await comprobarLimite(
+        "buscar",
+        ipDeCabeceras(await headers()),
+        MAX_BUSQUEDAS,
+        VENTANA_SEGUNDOS,
+      )
+    : "permitido";
+
+  const excedido = limite === "excedido";
+
+  const { productos, error } =
+    consultaValida && !excedido
+      ? await buscarProductos(termino)
+      : { productos: [], error: null };
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6">
@@ -83,7 +119,7 @@ export default async function BuscarPage({
           )}
         </h1>
 
-        {consultaValida && !error && (
+        {consultaValida && !error && !excedido && (
           <p className="mt-2 text-sm text-neutral-500">
             {productos.length}{" "}
             {productos.length === 1 ? "resultado" : "resultados"}
@@ -94,6 +130,17 @@ export default async function BuscarPage({
           </p>
         )}
       </header>
+
+      {excedido && (
+        <p
+          role="alert"
+          className="mt-10 flex items-start gap-2 border border-neutral-300 bg-neutral-50 px-4 py-3 text-sm text-neutral-700"
+        >
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          Has hecho muchas búsquedas seguidas. Espera un minuto e inténtalo de
+          nuevo.
+        </p>
+      )}
 
       {!consultaValida && (
         <p className="mt-10 border border-dashed border-neutral-300 px-6 py-20 text-center text-sm text-neutral-500">
@@ -111,7 +158,7 @@ export default async function BuscarPage({
         </p>
       )}
 
-      {consultaValida && !error && productos.length === 0 && (
+      {consultaValida && !error && !excedido && productos.length === 0 && (
         <div className="mt-10 flex flex-col items-center border border-dashed border-neutral-300 px-6 py-20 text-center">
           <SearchX className="h-8 w-8 text-neutral-300" aria-hidden />
           <p className="mt-4 text-sm font-bold tracking-wide text-black uppercase">

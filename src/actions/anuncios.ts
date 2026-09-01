@@ -3,8 +3,52 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { z } from "zod";
+
 import { createClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
+import { entero, primerError, sinEtiquetas } from "@/lib/validacion";
+
+/** Posicion maxima en la barra. */
+const ORDEN_MAXIMO = 999;
+
+/**
+ * Esquema del alta de anuncio.
+ *
+ * `texto` usa `sinEtiquetas`: la barra es una frase corta de marketing y no
+ * tiene ninguna razon legitima para llevar marcado. Rechazarlo aqui mantiene
+ * el dato limpio aunque React ya lo escaparia al pintarlo.
+ *
+ * `url_destino` solo admite rutas internas. Sin esa regla, quien entre al panel
+ * podria convertir la barra que corona TODAS las paginas en un enlace a un
+ * dominio ajeno. `//evil.com` es protocolo-relativo y sale del sitio igual que
+ * `https://`, por eso se descarta aparte.
+ */
+const esquemaAnuncio = z.object({
+  texto: sinEtiquetas(120).pipe(
+    z.string().min(3, "escribe el texto del anuncio"),
+  ),
+  url_destino: sinEtiquetas(300)
+    .optional()
+    .default("")
+    .refine(
+      (valor) =>
+        valor === "" || (valor.startsWith("/") && !valor.startsWith("//")),
+      {
+        message:
+          "debe ser una ruta interna que empiece por una barra, por ejemplo /productos, o quedar vacio",
+      },
+    )
+    .transform((valor) => (valor === "" ? null : valor)),
+  orden: z
+    .union([z.literal(""), entero(ORDEN_MAXIMO)])
+    .optional()
+    .default(0)
+    .transform((valor) => (valor === "" ? 0 : valor)),
+});
+
+/** Solo el orden; el id viaja por `bind`, fuera del formulario. */
+const esquemaOrden = z.object({ orden: entero(ORDEN_MAXIMO) });
 
 const PANEL = "/admin/apariencia";
 
@@ -15,11 +59,6 @@ export type ResultadoAnuncios =
 
 export type ResultadoAnuncio =
   { exito: true } | { exito: false; error: string };
-
-function texto(formData: FormData, campo: string): string {
-  const valor = formData.get(campo);
-  return typeof valor === "string" ? valor.trim() : "";
-}
 
 function volverConError(mensaje: string): never {
   redirect(`${PANEL}?error=${encodeURIComponent(mensaje)}`);
@@ -33,21 +72,6 @@ function volverConError(mensaje: string): never {
 function refrescarTienda() {
   revalidatePath("/", "layout");
   revalidatePath(PANEL);
-}
-
-/**
- * Sólo rutas internas.
- *
- * Sin esta comprobación, quien entre al panel podría convertir la barra que
- * corona todas las páginas en un enlace a un dominio ajeno. `//evil.com` es un
- * enlace protocolo-relativo y sale de la web igual que `https://`, por eso se
- * descarta aparte. La restricción `anuncios_url_interna` repite la regla en la
- * base, para las ediciones hechas desde el dashboard de Supabase.
- */
-function normalizarUrl(valor: string): string | null | undefined {
-  if (valor === "") return null;
-  if (!valor.startsWith("/") || valor.startsWith("//")) return undefined;
-  return valor;
 }
 
 export async function obtenerAnuncios(): Promise<ResultadoAnuncios> {
@@ -68,32 +92,15 @@ export async function obtenerAnuncios(): Promise<ResultadoAnuncios> {
 }
 
 export async function crearAnuncio(formData: FormData) {
-  const mensaje = texto(formData, "texto");
+  const validado = esquemaAnuncio.safeParse(
+    Object.fromEntries(formData.entries()),
+  );
 
-  if (mensaje.length < 3) {
-    volverConError("Escribe el texto del anuncio.");
+  if (!validado.success) {
+    volverConError(primerError(validado.error));
   }
 
-  // La barra es una sola línea y no hace scroll: un texto largo se corta o
-  // parte el diseño en móvil. Se limita aquí antes de guardarlo.
-  if (mensaje.length > 120) {
-    volverConError(
-      "El anuncio es demasiado largo. Máximo 120 caracteres para que quepa en la barra.",
-    );
-  }
-
-  const url = normalizarUrl(texto(formData, "url_destino"));
-
-  if (url === undefined) {
-    volverConError(
-      "El enlace debe ser una ruta interna que empiece por «/», por ejemplo /productos. Déjalo vacío si el anuncio no lleva a ningún sitio.",
-    );
-  }
-
-  const ordenCrudo = Number.parseInt(texto(formData, "orden"), 10);
-  const orden = Number.isFinite(ordenCrudo)
-    ? Math.min(Math.max(ordenCrudo, 0), 999)
-    : 0;
+  const { texto: mensaje, url_destino: url, orden } = validado.data;
 
   const supabase = await createClient();
 
@@ -119,21 +126,23 @@ export async function crearAnuncio(formData: FormData) {
 
 /** Se usa con `.bind(null, id)`: el identificador no viaja en el formulario. */
 export async function actualizarOrdenAnuncio(id: string, formData: FormData) {
-  if (!id) {
+  if (!z.uuid().safeParse(id).success) {
     volverConError("Falta el identificador del anuncio.");
   }
 
-  const ordenCrudo = Number.parseInt(texto(formData, "orden"), 10);
+  const validado = esquemaOrden.safeParse(
+    Object.fromEntries(formData.entries()),
+  );
 
-  if (!Number.isFinite(ordenCrudo)) {
-    volverConError("El orden debe ser un número.");
+  if (!validado.success) {
+    volverConError(`El orden ${primerError(validado.error)}.`);
   }
 
   const supabase = await createClient();
 
   const { data, error } = await supabase
     .from("anuncios")
-    .update({ orden: Math.min(Math.max(ordenCrudo, 0), 999) })
+    .update({ orden: validado.data.orden })
     .eq("id", id)
     .select("id");
 
@@ -160,7 +169,7 @@ export async function alternarEstadoAnuncio(
   id: string,
   estadoActual: boolean,
 ): Promise<ResultadoAnuncio> {
-  if (!id) {
+  if (!z.uuid().safeParse(id).success) {
     return { exito: false, error: "Falta el identificador del anuncio." };
   }
 
@@ -197,7 +206,7 @@ export async function alternarEstadoAnuncio(
  * Action llega al navegador como el error genérico #441 de React.
  */
 export async function eliminarAnuncio(id: string): Promise<ResultadoAnuncio> {
-  if (!id) {
+  if (!z.uuid().safeParse(id).success) {
     return { exito: false, error: "Falta el identificador del anuncio." };
   }
 
