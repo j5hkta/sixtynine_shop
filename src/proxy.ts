@@ -1,14 +1,22 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
+import { RUTA_ACCESO } from "@/lib/rutas";
 import { getSupabaseEnv } from "@/lib/supabase/env";
 import type { Database } from "@/lib/supabase/types";
 
 /** Cookie que acredita haber entrado por la ruta secreta. */
 const COOKIE_PUERTA = "sn_acceso";
 
-/** Rutas internas del panel. Sólo alcanzables tras pasar por la puerta. */
-const RUTAS_PRIVADAS = ["/admin", "/login"];
+/**
+ * Rutas internas del panel. Sólo alcanzables tras pasar por la puerta.
+ *
+ * La pantalla de acceso sigue en esta lista a propósito: está exenta de la
+ * comprobación de sesión —eso es lo que evita el bucle de redirección— pero no
+ * de la puerta. Sacarla de aquí la volvería accesible para cualquiera que
+ * acertara la URL, que es justo lo contrario de lo que se busca.
+ */
+const RUTAS_PRIVADAS = ["/admin", RUTA_ACCESO];
 
 type Puerta =
   | { activa: false }
@@ -62,21 +70,25 @@ function comoInexistente(request: NextRequest) {
  * Responsabilidades:
  *  1. Ocultar el panel tras la ruta secreta de `ADMIN_PATH`.
  *  2. Refrescar el token de sesión de Supabase y escribirlo en la respuesta.
- *  3. Expulsar a `/login` a quien no tenga sesión al entrar a `/admin/*`.
+ *  3. Expulsar a la pantalla de acceso a quien no tenga sesión al entrar a
+ *     `/admin/*`.
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const puerta = estadoPuerta();
 
   // --- 1. Entrada por la ruta secreta --------------------------------------
-  // Sella una cookie y manda al login. A partir de ahí el panel navega con sus
-  // rutas normales, así que no hay que reescribir ningún enlace interno.
+  // Sella una cookie y manda a la pantalla de acceso. A partir de ahí el panel
+  // navega con sus rutas normales, así que no hay que reescribir ningún enlace
+  // interno.
   if (
     puerta.activa &&
     puerta.prefijo &&
     (pathname === `/${puerta.prefijo}` || pathname === `/${puerta.prefijo}/`)
   ) {
-    const respuesta = NextResponse.redirect(new URL("/login", request.nextUrl));
+    const respuesta = NextResponse.redirect(
+      new URL(RUTA_ACCESO, request.nextUrl),
+    );
 
     respuesta.cookies.set(COOKIE_PUERTA, puerta.prefijo, {
       httpOnly: true,
@@ -107,7 +119,9 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  // `/login` ya pasó la puerta; la autenticación se comprueba sólo en /admin.
+  // La pantalla de acceso ya pasó la puerta; la sesión se comprueba sólo en
+  // /admin. Sin esta salida, pedirle sesión a la propia pantalla de login la
+  // redirigiría a sí misma en bucle.
   if (!pathname.startsWith("/admin")) {
     return NextResponse.next();
   }
@@ -152,7 +166,7 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    const loginUrl = new URL("/login", request.nextUrl);
+    const loginUrl = new URL(RUTA_ACCESO, request.nextUrl);
     loginUrl.searchParams.set(
       "redirectTo",
       `${request.nextUrl.pathname}${request.nextUrl.search}`,

@@ -16,7 +16,7 @@ function mensajeDeError(mensaje: string): string {
   return mensaje;
 }
 
-/** `redirectTo` llega ya saneado desde `src/app/login/page.tsx`. */
+/** `redirectTo` llega ya saneado desde `src/app/acceso-x69-privado/page.tsx`. */
 export default function LoginForm({ redirectTo }: { redirectTo: string }) {
   const router = useRouter();
 

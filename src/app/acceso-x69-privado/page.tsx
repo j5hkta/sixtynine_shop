@@ -20,7 +20,9 @@ function safeRedirect(value: string | string[] | undefined): string {
   return value;
 }
 
-export default async function LoginPage({ searchParams }: PageProps<"/login">) {
+export default async function LoginPage({
+  searchParams,
+}: PageProps<"/acceso-x69-privado">) {
   const params = await searchParams;
   const redirectTo = safeRedirect(params.redirectTo);
   const sinPermisos = params.error === "unauthorized";

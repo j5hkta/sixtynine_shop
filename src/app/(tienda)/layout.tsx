@@ -46,7 +46,8 @@ async function cargarAnuncios(): Promise<AnuncioBarra[]> {
  *
  * Vive en el grupo de rutas `(tienda)`, que no aparece en la URL: `/` y
  * `/productos` siguen siendo `/` y `/productos`. Está separado del layout raíz
- * para que el Navbar público no se cuele en `/admin` ni en `/login`.
+ * para que el Navbar público no se cuele en `/admin` ni en la pantalla de
+ * acceso.
  *
  * Estética outlet: fondo blanco, texto negro, bordes grises finos. Las únicas
  * zonas negras son las dos franjas del Navbar y el pie.

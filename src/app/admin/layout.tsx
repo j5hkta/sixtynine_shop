@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import NextTopLoader from "nextjs-toploader";
 
 import AdminShell from "@/components/admin/AdminShell";
+import { RUTA_ACCESO } from "@/lib/rutas";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
@@ -27,7 +28,7 @@ export default async function AdminLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login?redirectTo=/admin");
+    redirect(`${RUTA_ACCESO}?redirectTo=/admin`);
   }
 
   // Autorización: estar autenticado no basta, hace falta rol 'admin'.
@@ -46,7 +47,7 @@ export default async function AdminLayout({
   }
 
   if (perfil?.rol !== "admin") {
-    redirect("/login?error=unauthorized");
+    redirect(`${RUTA_ACCESO}?error=unauthorized`);
   }
 
   return (

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
+import { RUTA_ACCESO } from "@/lib/rutas";
 import { createClient } from "@/lib/supabase/server";
 
 /**
@@ -24,5 +25,9 @@ export async function logoutAction() {
   // ninguna pagina renderizada con el usuario anterior quede cacheada.
   revalidatePath("/", "layout");
 
-  redirect("/login");
+  // A la pantalla de acceso y no a la portada: quien cierra sesion en el panel
+  // casi siempre quiere volver a entrar. `signOut()` borra las cookies de
+  // Supabase pero no la de la puerta (`sn_acceso`), asi que esta ruta sigue
+  // siendo alcanzable sin pasar otra vez por `ADMIN_PATH`.
+  redirect(RUTA_ACCESO);
 }
