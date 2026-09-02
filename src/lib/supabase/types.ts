@@ -43,9 +43,11 @@ export type Database = {
           precio: number;
           /** Precio tachado. Null = sin descuento. Ver `marketing_descuentos.sql`. */
           precio_original: number | null;
-          stock: number;
+          /** Unidades por talla. Ver `supabase/inventario_variantes.sql`. */
+          inventario_tallas: Record<string, number>;
+          /** Columna GENERADA: suma de `inventario_tallas`. Nunca se escribe. */
+          stock_total: number;
           categoria: string | null;
-          tallas: string[] | null;
           imagenes: string[] | null;
           estado: EstadoProducto;
           /** Ver `supabase/secciones_portada.sql`. */
@@ -58,9 +60,8 @@ export type Database = {
           descripcion?: string | null;
           precio: number;
           precio_original?: number | null;
-          stock?: number;
+          inventario_tallas?: Record<string, number>;
           categoria?: string | null;
-          tallas?: string[] | null;
           imagenes?: string[] | null;
           estado?: EstadoProducto;
           seccion_portada?: SeccionPortada;
@@ -72,9 +73,8 @@ export type Database = {
           descripcion?: string | null;
           precio?: number;
           precio_original?: number | null;
-          stock?: number;
+          inventario_tallas?: Record<string, number>;
           categoria?: string | null;
-          tallas?: string[] | null;
           imagenes?: string[] | null;
           estado?: EstadoProducto;
           seccion_portada?: SeccionPortada;
@@ -167,7 +167,7 @@ export type Database = {
           producto_id: string;
           cantidad: number;
           precio_unitario: number;
-          talla: string | null;
+          talla_seleccionada: string | null;
         };
         Insert: {
           id?: string;
@@ -175,7 +175,7 @@ export type Database = {
           producto_id: string;
           cantidad: number;
           precio_unitario: number;
-          talla?: string | null;
+          talla_seleccionada?: string | null;
         };
         Update: {
           id?: string;
@@ -183,7 +183,7 @@ export type Database = {
           producto_id?: string;
           cantidad?: number;
           precio_unitario?: number;
-          talla?: string | null;
+          talla_seleccionada?: string | null;
         };
         Relationships: [
           {

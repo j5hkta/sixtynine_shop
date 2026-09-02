@@ -55,7 +55,7 @@ async function cargarProducto(id: string) {
     const { data, error } = await supabase
       .from("productos")
       .select(
-        "id, titulo, descripcion, precio, precio_original, stock, categoria, tallas, imagenes, estado",
+        "id, titulo, descripcion, precio, precio_original, inventario_tallas, categoria, imagenes, estado",
       )
       .eq("id", id)
       .neq("estado", "borrador")
@@ -101,8 +101,14 @@ export default async function ProductoDetallePage({
   }
 
   const imagenes = producto.imagenes ?? [];
-  const tallas = producto.tallas ?? [];
-  const hayStock = producto.stock > 0 && producto.estado !== "agotado";
+  const inventario = producto.inventario_tallas ?? {};
+  // `stock_total` no se pide en el select: sumar aqui las mismas claves que ya
+  // viajan evita traer una columna mas solo para repetir la cuenta.
+  const unidades = Object.values(inventario).reduce(
+    (suma, n) => suma + (Number(n) || 0),
+    0,
+  );
+  const hayStock = unidades > 0 && producto.estado !== "agotado";
   const descuento = calcularDescuento(
     producto.precio,
     producto.precio_original,
@@ -187,7 +193,7 @@ export default async function ProductoDetallePage({
               titulo={producto.titulo}
               precio={producto.precio}
               imagen={imagenes[0] ?? null}
-              tallas={tallas}
+              inventario={inventario}
               disponible={hayStock}
             />
           </div>

@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 
 import { textoEnvio } from "@/lib/envio";
+import { TALLA_UNICA } from "@/lib/validacion";
 import { moneda } from "@/lib/formato";
 import {
   useCarrito,
@@ -20,7 +21,13 @@ import {
   type ItemCarrito,
 } from "@/store/carrito";
 
-/** Tope defensivo: el carrito no conoce el stock real del producto. */
+/**
+ * Tope absoluto por linea.
+ *
+ * El limite real lo pone ahora `item.stockDisponible`, que es el inventario de
+ * la talla concreta. Este numero solo actua de red por si esa cifra llegara
+ * corrupta desde un `localStorage` viejo o manipulado a mano.
+ */
 const CANTIDAD_MAXIMA = 99;
 
 export default function CarritoPage() {
@@ -187,7 +194,14 @@ function LineaCarrito({
   onRemover: (id: string) => void;
 }) {
   const enMinimo = item.cantidad <= 1;
-  const enMaximo = item.cantidad >= CANTIDAD_MAXIMA;
+
+  // Tope por talla, no global: dos unidades de la M no se convierten en tope
+  // para la L del mismo producto.
+  const tope = Math.min(
+    CANTIDAD_MAXIMA,
+    Math.max(1, Number(item.stockDisponible) || 1),
+  );
+  const enMaximo = item.cantidad >= tope;
 
   return (
     <li className="flex gap-3 border border-neutral-200 bg-white p-3 transition-colors hover:border-black sm:gap-4 sm:p-4">
@@ -232,7 +246,9 @@ function LineaCarrito({
           </p>
         </div>
 
-        {item.talla && (
+        {/* "Unica" es la clave interna de los productos sin variantes: no
+            aporta nada al comprador y ensuciaria todas las lineas. */}
+        {item.talla && item.talla !== TALLA_UNICA && (
           <p className="text-[11px] font-bold tracking-[0.15em] text-neutral-500 uppercase">
             Talla{" "}
             <span className="font-mono text-neutral-700">{item.talla}</span>
@@ -242,6 +258,14 @@ function LineaCarrito({
         <p className="text-xs text-neutral-500">
           <span className="font-mono">{moneda.format(item.precio)}</span> c/u
         </p>
+
+        {enMaximo && (
+          <p className="text-[11px] font-bold tracking-[0.1em] text-neutral-500 uppercase">
+            {tope === 1
+              ? "Última unidad"
+              : `Máximo ${tope} en esta talla`}
+          </p>
+        )}
 
         {/* Cantidad. `flex-wrap` + `min-w-0`: si no cabe, la papelera baja a
             la línea siguiente en vez de desbordar la tarjeta. */}

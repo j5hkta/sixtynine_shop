@@ -116,3 +116,112 @@ export function primerError(error: z.ZodError): string {
   const campo = problema.path.join(".");
   return campo ? `${campo}: ${problema.message}` : problema.message;
 }
+
+/** Clave que usan los productos sin tallas (skates, accesorios). */
+export const TALLA_UNICA = "Unica";
+
+/** Tope de unidades por talla. Muy por encima de lo real, pero acotado. */
+const UNIDADES_MAXIMAS = 100_000;
+
+/** Tope de variantes por producto. */
+const VARIANTES_MAXIMAS = 30;
+
+/**
+ * Inventario por talla: {"S": 10, "M": 4, "L": 0}.
+ *
+ * Llega del formulario como dos listas paralelas —una de nombres y otra de
+ * cantidades— porque un `<input>` no sabe enviar un objeto. Se emparejan aqui.
+ *
+ * Reglas que importan:
+ *
+ * - Una talla sin nombre se descarta en silencio: el formulario permite anadir
+ *   filas y dejarlas a medias, y abortar el guardado por una fila vacia seria
+ *   un incordio.
+ * - Una talla repetida es un ERROR, no una suma. Si alguien escribe "M" dos
+ *   veces con 3 y 5 unidades, ni 3 ni 5 ni 8 es obviamente lo que queria: es
+ *   mejor decirselo que elegir por el.
+ * - Cero es un valor legitimo, no una talla ausente. Distingue "esta talla
+ *   existe pero se agoto" —que la ficha pinta tachada— de "esta talla no se
+ *   fabrica", que no aparece.
+ */
+export function inventarioTallas() {
+  return z
+    .object({
+      inventario_talla: z.union([z.string(), z.array(z.string())]).optional(),
+      inventario_cantidad: z
+        .union([z.string(), z.array(z.string())])
+        .optional(),
+    })
+    .transform((campos, ctx) => {
+      const nombres = comoLista(campos.inventario_talla);
+      const cantidades = comoLista(campos.inventario_cantidad);
+
+      const inventario: Record<string, number> = {};
+
+      for (const [indice, nombreCrudo] of nombres.entries()) {
+        const talla = limpiarControl(nombreCrudo).replace(/\s+/g, " ").trim();
+
+        if (talla === "") continue;
+
+        if (talla.length > 20) {
+          ctx.addIssue({
+            code: "custom",
+            message: `la talla "${talla.slice(0, 20)}..." es demasiado larga`,
+          });
+          return z.NEVER;
+        }
+
+        if (talla in inventario) {
+          ctx.addIssue({
+            code: "custom",
+            message: `la talla "${talla}" esta repetida`,
+          });
+          return z.NEVER;
+        }
+
+        // `Number("")` es 0, asi que una cantidad en blanco se guardaria como
+        // "talla agotada" sin que nadie lo pidiera. Se descarta antes de
+        // convertir.
+        const cantidadCruda = (cantidades[indice] ?? "").trim();
+        const unidades = cantidadCruda === "" ? NaN : Number(cantidadCruda);
+
+        if (
+          !Number.isInteger(unidades) ||
+          unidades < 0 ||
+          unidades > UNIDADES_MAXIMAS
+        ) {
+          ctx.addIssue({
+            code: "custom",
+            message: `las unidades de "${talla}" deben ser un entero entre 0 y ${UNIDADES_MAXIMAS}`,
+          });
+          return z.NEVER;
+        }
+
+        inventario[talla] = unidades;
+      }
+
+      if (Object.keys(inventario).length === 0) {
+        ctx.addIssue({
+          code: "custom",
+          message: "anade al menos una talla con sus unidades",
+        });
+        return z.NEVER;
+      }
+
+      if (Object.keys(inventario).length > VARIANTES_MAXIMAS) {
+        ctx.addIssue({
+          code: "custom",
+          message: `no se admiten mas de ${VARIANTES_MAXIMAS} tallas por producto`,
+        });
+        return z.NEVER;
+      }
+
+      return inventario;
+    });
+}
+
+/** Un campo repetido en un formulario llega como string o como array. */
+function comoLista(valor: string | string[] | undefined): string[] {
+  if (valor === undefined) return [];
+  return Array.isArray(valor) ? valor : [valor];
+}

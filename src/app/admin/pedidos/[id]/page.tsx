@@ -229,11 +229,11 @@ export default async function DetallePedidoPage({
                       </p>
 
                       <p className="text-[11px] font-bold tracking-[0.15em] text-neutral-500 uppercase">
-                        {item.talla ? (
+                        {item.talla_seleccionada ? (
                           <>
                             Talla{" "}
                             <span className="font-mono text-neutral-300">
-                              {item.talla}
+                              {item.talla_seleccionada}
                             </span>{" "}
                             ·{" "}
                           </>

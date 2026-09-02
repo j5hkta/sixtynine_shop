@@ -10,8 +10,17 @@ export type ItemCarrito = {
   id_producto: string;
   titulo: string;
   precio: number;
-  /** `null` cuando el producto no maneja tallas. */
+  /** Clave de `inventario_tallas`. Los productos sin tallas usan "Unica". */
   talla: string | null;
+  /**
+   * Unidades disponibles de ESA talla cuando se anadio la linea.
+   *
+   * Es una foto, no la verdad: el catalogo puede cambiar mientras el carrito
+   * duerme en `localStorage`. Sirve para topar el selector de cantidad; quien
+   * de verdad impide la sobreventa es `procesar_checkout()`, que relee el
+   * inventario con la fila bloqueada.
+   */
+  stockDisponible: number;
   /** Portada, o `null` si el producto no tiene imágenes. */
   imagen: string | null;
   cantidad: number;
@@ -53,7 +62,17 @@ export const useCarrito = create<EstadoCarrito>()(
             return {
               items: estado.items.map((item) =>
                 item.id === id
-                  ? { ...item, cantidad: item.cantidad + cantidad }
+                  ? {
+                      ...item,
+                      // Se refresca el tope con el dato mas reciente y se
+                      // recorta: sin esto, pulsar "anadir" cinco veces en una
+                      // talla con dos unidades dejaria una linea de cinco.
+                      stockDisponible: nuevo.stockDisponible,
+                      cantidad: Math.min(
+                        item.cantidad + cantidad,
+                        Math.max(1, nuevo.stockDisponible),
+                      ),
+                    }
                   : item,
               ),
             };
@@ -70,6 +89,7 @@ export const useCarrito = create<EstadoCarrito>()(
                 // que reconciliarlo al pagar, no confiar en esta copia.
                 precio: nuevo.precio,
                 talla: nuevo.talla,
+                stockDisponible: nuevo.stockDisponible,
                 imagen: nuevo.imagen,
                 cantidad,
               },
@@ -93,7 +113,13 @@ export const useCarrito = create<EstadoCarrito>()(
 
           return {
             items: estado.items.map((item) =>
-              item.id === id ? { ...item, cantidad: nueva } : item,
+              item.id === id
+                ? {
+                    // El tope es el stock de la talla concreta, no un global.
+                    ...item,
+                    cantidad: Math.min(nueva, Math.max(1, item.stockDisponible)),
+                  }
+                : item,
             ),
           };
         }),
@@ -102,7 +128,26 @@ export const useCarrito = create<EstadoCarrito>()(
     }),
     {
       name: "sixtynine-carrito",
-      version: 1,
+      // 1 -> 2: se anadio `stockDisponible`. Las lineas guardadas antes de la
+      // migracion a inventario por tallas no lo traen, y sin un valor por
+      // defecto el tope saldria `NaN` y bloquearia el selector en 1.
+      version: 2,
+      migrate: (guardado, versionPrevia) => {
+        const estado = guardado as { items?: ItemCarrito[] } | undefined;
+        if (versionPrevia >= 2 || !estado?.items) return estado as never;
+
+        return {
+          ...estado,
+          items: estado.items.map((item) => ({
+            ...item,
+            stockDisponible:
+              typeof item.stockDisponible === "number" &&
+              Number.isFinite(item.stockDisponible)
+                ? item.stockDisponible
+                : item.cantidad,
+          })),
+        } as never;
+      },
       // `window.localStorage`, no el `localStorage` global a secas: en el
       // servidor el primero lanza ReferenceError, que `createJSONStorage`
       // captura para devolver un storage vacío. El global suelto existe en

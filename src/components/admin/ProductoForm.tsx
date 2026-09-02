@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ImageUp } from "lucide-react";
 
 import BotonGuardar from "@/components/admin/BotonGuardar";
+import EditorInventario from "@/components/admin/EditorInventario";
 import { CATEGORIAS } from "@/lib/categorias";
 import {
   DATOS_SECCION,
@@ -31,10 +32,9 @@ export type ValoresProducto = {
   precio: number;
   /** Vacío si el producto no está rebajado. */
   precioOriginal: string;
-  stock: number;
+  /** Unidades por talla. Vacio en el alta. */
+  inventario: Record<string, number>;
   categoria: string;
-  /** Separadas por coma, ej. "S, M, L". */
-  tallas: string;
   /** URLs públicas ya guardadas en el producto. */
   imagenes: string[];
   estado: EstadoProducto;
@@ -46,9 +46,8 @@ const VACIO: ValoresProducto = {
   descripcion: "",
   precio: 0,
   precioOriginal: "",
-  stock: 0,
+  inventario: {},
   categoria: "",
-  tallas: "",
   imagenes: [],
   estado: "activo",
   seccionPortada: "ninguna",
@@ -126,38 +125,20 @@ export default function ProductoForm({
         />
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <div className="space-y-2">
-          <label htmlFor="precio" className={labelClase}>
-            Precio (S/)
-          </label>
-          <input
-            id="precio"
-            name="precio"
-            type="number"
-            required
-            min={0}
-            step={0.01}
-            defaultValue={valores.precio}
-            className={`${inputClase} font-mono`}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="stock" className={labelClase}>
-            Stock
-          </label>
-          <input
-            id="stock"
-            name="stock"
-            type="number"
-            required
-            min={0}
-            step={1}
-            defaultValue={valores.stock}
-            className={`${inputClase} font-mono`}
-          />
-        </div>
+      <div className="space-y-2">
+        <label htmlFor="precio" className={labelClase}>
+          Precio (S/)
+        </label>
+        <input
+          id="precio"
+          name="precio"
+          type="number"
+          required
+          min={0}
+          step={0.01}
+          defaultValue={valores.precio}
+          className={`${inputClase} font-mono sm:max-w-[calc(50%-0.75rem)]`}
+        />
       </div>
 
       <div className="space-y-2">
@@ -248,21 +229,15 @@ export default function ProductoForm({
       </div>
 
       <div className="space-y-2">
-        <label htmlFor="tallas" className={labelClase}>
-          Tallas Disponibles
-        </label>
-        <input
-          id="tallas"
-          name="tallas"
-          type="text"
-          defaultValue={valores.tallas}
-          placeholder="S, M, L"
-          aria-describedby="tallas-ayuda"
-          className={inputClase}
-        />
-        <p id="tallas-ayuda" className={ayudaClase}>
-          Separa los valores por comas. Ej: <code>S, M, L</code> o{" "}
-          <code>7.5, 8.0, 8.25</code>. Déjalo vacío si no aplica.
+        <span className={labelClase}>Inventario por talla</span>
+
+        <EditorInventario inicial={valores.inventario} />
+
+        <p className={ayudaClase}>
+          Cada fila es una variante con su propio stock. Una talla en{" "}
+          <code>0</code> sigue apareciendo en la ficha, tachada: eso distingue
+          «agotada, vuelve pronto» de «no existe». Para skates y accesorios usa
+          la plantilla <strong>Sin tallas</strong>.
         </p>
       </div>
 

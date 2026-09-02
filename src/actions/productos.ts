@@ -10,9 +10,8 @@ import { archivosDeFormData, subirImagenes } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/server";
 import type { ProductoInsert, ProductoUpdate } from "@/lib/supabase/types";
 import {
-  entero,
   importe,
-  limpiarControl,
+  inventarioTallas,
   primerError,
   textoCorto,
   textoLargo,
@@ -20,9 +19,6 @@ import {
 
 const LISTADO = "/admin/productos";
 const FORMULARIO_NUEVO = "/admin/productos/nuevo";
-
-/** Tope de unidades por producto. Muy por encima de lo real, pero acotado. */
-const STOCK_MAXIMO = 100_000;
 
 function volverConError(destino: string, mensaje: string): never {
   redirect(`${destino}?error=${encodeURIComponent(mensaje)}`);
@@ -33,7 +29,7 @@ function volverConError(destino: string, mensaje: string): never {
  *
  * Son cuatro y no una porque cualquiera de ellas puede cambiar al guardar: la
  * portada se arma con `seccion_portada`, y el catalogo, las categorias y la
- * ficha filtran por `stock > 0`, asi que reponer inventario tiene que devolver
+ * ficha filtran por `stock_total > 0`, asi que reponer inventario tiene que devolver
  * el producto a la tienda en el acto. Sin esto tardaria hasta 60 s y pareceria
  * que el panel no guardo nada.
  *
@@ -78,21 +74,6 @@ const esquemaProducto = z
       .optional()
       .default("")
       .transform((valor) => (valor === "" ? null : valor)),
-    stock: entero(STOCK_MAXIMO),
-    tallas: z
-      .string()
-      .optional()
-      .default("")
-      .transform((valor) =>
-        limpiarControl(valor)
-          .split(",")
-          .map((talla) => talla.trim())
-          // Sin el filtro, un campo vacío produce [""] y el producto queda con
-          // una talla fantasma. También limpia "S, , L" y la coma final.
-          .filter(Boolean)
-          .slice(0, 30)
-          .map((talla) => talla.slice(0, 20)),
-      ),
     estado: z.enum(["activo", "borrador", "agotado"]).optional().default("activo"),
     seccion_portada: z.enum(SECCIONES_PORTADA).optional().default("ninguna"),
   })
@@ -111,7 +92,9 @@ const esquemaProducto = z
     categoria: campos.categoria || null,
   }));
 
-type CamposProducto = z.output<typeof esquemaProducto>;
+type CamposProducto = z.output<typeof esquemaProducto> & {
+  inventario_tallas: Record<string, number>;
+};
 
 /**
  * Lee y valida los campos comunes al alta y la edicion.
@@ -131,7 +114,19 @@ function leerCampos(formData: FormData, destinoError: string): CamposProducto {
     volverConError(destinoError, primerError(resultado.error));
   }
 
-  return resultado.data;
+  // El inventario se valida aparte porque `Object.fromEntries()` se queda con
+  // el ULTIMO valor de cada campo repetido, y aqui `inventario_talla` viene una
+  // vez por fila del formulario. Hay que leerlas con `getAll()`.
+  const inventario = inventarioTallas().safeParse({
+    inventario_talla: formData.getAll("inventario_talla").map(String),
+    inventario_cantidad: formData.getAll("inventario_cantidad").map(String),
+  });
+
+  if (!inventario.success) {
+    volverConError(destinoError, primerError(inventario.error));
+  }
+
+  return { ...resultado.data, inventario_tallas: inventario.data };
 }
 
 function mensajeDeErrorSupabase(code: string, message: string, verbo: string) {

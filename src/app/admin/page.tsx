@@ -69,7 +69,7 @@ async function cargarMetricas(): Promise<Metricas> {
       .from("productos")
       .select("id", { count: "exact", head: true })
       .eq("estado", "activo")
-      .lte("stock", STOCK_CRITICO),
+      .lte("stock_total", STOCK_CRITICO),
 
     supabase
       .from("pedidos")

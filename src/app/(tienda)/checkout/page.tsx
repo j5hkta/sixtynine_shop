@@ -20,6 +20,7 @@ import {
   type Agencia,
 } from "@/lib/envio";
 import { moneda } from "@/lib/formato";
+import { TALLA_UNICA } from "@/lib/validacion";
 import { useCarrito, useHidratado, useTotalPrecio } from "@/store/carrito";
 
 const inputClase =
@@ -365,7 +366,9 @@ export default function CheckoutPage() {
                     {item.titulo}
                   </span>
                   <span className="text-xs text-neutral-500">
-                    {item.talla ? `Talla ${item.talla} · ` : ""}
+                    {item.talla && item.talla !== TALLA_UNICA
+                      ? `Talla ${item.talla} · `
+                      : ""}
                     {item.cantidad} u.
                   </span>
                 </span>

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ShoppingBag } from "lucide-react";
 
+import { TALLA_UNICA } from "@/lib/validacion";
 import { useCarrito } from "@/store/carrito";
 
 type AccionesProductoProps = {
@@ -11,13 +12,16 @@ type AccionesProductoProps = {
   precio: number;
   /** Portada del producto; se guarda en la línea del carrito. */
   imagen: string | null;
-  tallas: string[];
   /**
-   * Si se puede comprar. Booleano y no la cifra de stock a propósito: todo lo
-   * que reciba un Client Component viaja al navegador dentro del HTML, así que
-   * pasar `stock` dejaría el inventario exacto a la vista de cualquiera que
-   * mire el código fuente, justo lo que se quiere ocultar.
+   * Unidades por talla: `{"S": 10, "M": 0}`.
+   *
+   * Aquí SÍ viajan las cifras al navegador, a diferencia del resto de la ficha,
+   * donde se ocultan a propósito. No hay alternativa: el carrito tiene que
+   * poder topar la cantidad al stock de la talla elegida, y esa decisión ocurre
+   * en el cliente. Lo que sigue sin verse es el total del producto.
    */
+  inventario: Record<string, number>;
+  /** Si se puede comprar algo. Falso también con el estado 'agotado'. */
   disponible: boolean;
 };
 
@@ -26,12 +30,20 @@ export default function AccionesProducto({
   titulo,
   precio,
   imagen,
-  tallas,
+  inventario,
   disponible,
 }: AccionesProductoProps) {
   const agregarItem = useCarrito((estado) => estado.agregarItem);
 
-  const [talla, setTalla] = useState<string | null>(null);
+  const tallas = Object.keys(inventario);
+
+  // Un producto de talla única no plantea ninguna elección: se preselecciona
+  // para que el comprador no tenga que pulsar un botón con una sola opción.
+  const soloUnica = tallas.length === 1 && tallas[0] === TALLA_UNICA;
+
+  const [talla, setTalla] = useState<string | null>(
+    soloUnica ? TALLA_UNICA : null,
+  );
   const [aviso, setAviso] = useState<string | null>(null);
   const [confirmado, setConfirmado] = useState(false);
 
@@ -44,11 +56,17 @@ export default function AccionesProducto({
     };
   }, []);
 
+  const unidadesDeTalla = talla ? (inventario[talla] ?? 0) : 0;
   const sinStock = !disponible;
 
   function anadirAlCarrito() {
-    if (tallas.length > 0 && !talla) {
+    if (!talla) {
       setAviso("Selecciona una talla para continuar.");
+      return;
+    }
+
+    if (unidadesDeTalla <= 0) {
+      setAviso("Esa talla está agotada.");
       return;
     }
 
@@ -61,6 +79,10 @@ export default function AccionesProducto({
       talla,
       imagen,
       cantidad: 1,
+      // Viaja con la línea para que el carrito sepa dónde topar sin volver a
+      // consultar. Es una foto del momento: `procesar_checkout()` revalida
+      // contra la base al pagar, que es lo que de verdad impide la sobreventa.
+      stockDisponible: unidadesDeTalla,
     });
 
     setConfirmado(true);
@@ -70,7 +92,7 @@ export default function AccionesProducto({
 
   return (
     <div className="space-y-6">
-      {tallas.length > 0 && (
+      {!soloUnica && tallas.length > 0 && (
         <fieldset>
           <legend className="text-[11px] font-bold tracking-[0.2em] text-neutral-500 uppercase">
             Talla
@@ -78,20 +100,30 @@ export default function AccionesProducto({
 
           <div className="mt-3 flex flex-wrap gap-2">
             {tallas.map((opcion) => {
+              const unidades = inventario[opcion] ?? 0;
+              const agotada = unidades <= 0;
               const seleccionada = opcion === talla;
+
               return (
                 <button
                   key={opcion}
                   type="button"
+                  disabled={agotada}
                   onClick={() => {
                     setTalla(opcion);
                     setAviso(null);
                   }}
                   aria-pressed={seleccionada}
+                  // La talla agotada se muestra tachada en vez de ocultarse:
+                  // así se ve que el producto existe en esa talla y que lo que
+                  // falta es reposición, no que nunca se fabricó.
+                  title={agotada ? `Talla ${opcion} agotada` : undefined}
                   className={`min-w-14 border px-4 py-3 font-mono text-sm font-bold transition-colors ${
-                    seleccionada
-                      ? "border-black bg-black text-white"
-                      : "border-neutral-200 text-neutral-700 hover:border-black hover:text-black"
+                    agotada
+                      ? "cursor-not-allowed border-neutral-200 bg-neutral-50 text-neutral-300 line-through"
+                      : seleccionada
+                        ? "border-black bg-black text-white"
+                        : "border-neutral-200 text-neutral-700 hover:border-black hover:text-black"
                   }`}
                 >
                   {opcion}

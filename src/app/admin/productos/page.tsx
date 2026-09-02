@@ -20,7 +20,7 @@ export default async function ProductosPage() {
   const supabase = await createClient();
   const { data: productos, error } = await supabase
     .from("productos")
-    .select("id, titulo, descripcion, precio, stock, categoria, estado, creado_en")
+    .select("id, titulo, descripcion, precio, stock_total, categoria, estado, creado_en")
     .order("creado_en", { ascending: false });
 
   return (
@@ -127,10 +127,10 @@ export default async function ProductosPage() {
 
                   <td
                     className={`px-4 py-4 font-mono font-bold ${
-                      producto.stock <= 5 ? "text-red-400" : "text-neutral-300"
+                      producto.stock_total <= 5 ? "text-red-400" : "text-neutral-300"
                     }`}
                   >
-                    {producto.stock}
+                    {producto.stock_total}
                   </td>
 
                   <td className="px-4 py-4">
