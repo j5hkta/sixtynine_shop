@@ -73,15 +73,16 @@ async function cargarPortada(): Promise<DatosPortada> {
       supabase
         .from("productos")
         .select(`${CAMPOS_TARJETA}, seccion_portada`)
+        // `estado` es una columna generada: vale 'agotado' en cuanto el
+        // inventario llega a 0, asi que este filtro ya excluye lo que no tiene
+        // existencias. Ver `supabase/estado_automatico.sql`.
         .eq("estado", "activo")
-        .gt("stock_total", 0)
         .neq("seccion_portada", "ninguna")
         .order("creado_en", { ascending: false }),
       supabase
         .from("productos")
         .select(CAMPOS_TARJETA)
         .eq("estado", "activo")
-        .gt("stock_total", 0)
         .order("creado_en", { ascending: false })
         .limit(MAXIMO_POR_SECCION),
       supabase
@@ -124,7 +125,10 @@ async function cargarPortada(): Promise<DatosPortada> {
       // el tope se le aplica por pestaña, no al conjunto: con el límite global
       // una categoría con muchos productos vaciaría las otras tres.
       if (!grupo) continue;
-      if (producto.seccion_portada !== "ropa" && grupo.length >= MAXIMO_POR_SECCION) {
+      if (
+        producto.seccion_portada !== "ropa" &&
+        grupo.length >= MAXIMO_POR_SECCION
+      ) {
         continue;
       }
       grupo.push(producto);

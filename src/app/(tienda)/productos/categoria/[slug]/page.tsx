@@ -55,9 +55,10 @@ async function cargarCategoria(categoria: string) {
       .from("productos")
       .select("id, titulo, precio, precio_original, categoria, imagenes")
       .eq("categoria", categoria)
+      // `estado` es una columna generada: vale 'agotado' en cuanto el
+      // inventario llega a 0, asi que este filtro ya excluye lo que no tiene
+      // existencias. Ver `supabase/estado_automatico.sql`.
       .eq("estado", "activo")
-      // Los agotados salen del catálogo solos, sin que nadie los toque.
-      .gt("stock_total", 0)
       .order("creado_en", { ascending: false });
 
     if (error) throw error;

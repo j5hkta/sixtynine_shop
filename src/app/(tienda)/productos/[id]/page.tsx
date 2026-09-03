@@ -27,10 +27,7 @@ export const revalidate = 60;
 export async function generateStaticParams() {
   try {
     const supabase = createAnonClient();
-    const { data, error } = await supabase
-      .from("productos")
-      .select("id")
-      .neq("estado", "borrador");
+    const { data, error } = await supabase.from("productos").select("id");
 
     if (error) throw error;
 
@@ -45,9 +42,12 @@ export async function generateStaticParams() {
 }
 
 /**
- * La politica RLS de lectura es abierta (la tienda no tiene sesion), asi que
- * ocultar los borradores es responsabilidad de la app: sin este filtro, la URL
- * de un producto sin publicar seria accesible para cualquiera que la adivine.
+ * Sin filtro por estado, a proposito.
+ *
+ * Ya no existe 'borrador': `estado` lo calcula la base a partir del inventario.
+ * Un producto agotado conserva su ficha —con el boton deshabilitado— para que
+ * los enlaces compartidos no se conviertan en 404 en cuanto se vende la ultima
+ * unidad. Del catalogo si desaparece: eso lo filtran las otras consultas.
  */
 async function cargarProducto(id: string) {
   try {
@@ -58,7 +58,6 @@ async function cargarProducto(id: string) {
         "id, titulo, descripcion, precio, precio_original, inventario_tallas, categoria, imagenes, estado",
       )
       .eq("id", id)
-      .neq("estado", "borrador")
       .maybeSingle();
 
     if (error) throw error;

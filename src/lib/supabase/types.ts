@@ -22,7 +22,11 @@ export type Json =
 
 import type { SeccionPortada } from "@/lib/secciones";
 
-export type EstadoProducto = "activo" | "borrador" | "agotado";
+/**
+ * Estado del producto. GENERADO por la base a partir del inventario
+ * (ver `supabase/estado_automatico.sql`): nunca se escribe desde la app.
+ */
+export type EstadoProducto = "activo" | "agotado";
 
 /** Roles de `public.perfiles` (ver `supabase/roles_schema.sql`). */
 export type RolUsuario = "cliente" | "admin";
@@ -49,6 +53,7 @@ export type Database = {
           stock_total: number;
           categoria: string | null;
           imagenes: string[] | null;
+          /** Columna GENERADA a partir de `inventario_tallas`. Solo lectura. */
           estado: EstadoProducto;
           /** Ver `supabase/secciones_portada.sql`. */
           seccion_portada: SeccionPortada;
@@ -63,7 +68,6 @@ export type Database = {
           inventario_tallas?: Record<string, number>;
           categoria?: string | null;
           imagenes?: string[] | null;
-          estado?: EstadoProducto;
           seccion_portada?: SeccionPortada;
         };
         Update: {
@@ -76,7 +80,6 @@ export type Database = {
           inventario_tallas?: Record<string, number>;
           categoria?: string | null;
           imagenes?: string[] | null;
-          estado?: EstadoProducto;
           seccion_portada?: SeccionPortada;
         };
         Relationships: [];

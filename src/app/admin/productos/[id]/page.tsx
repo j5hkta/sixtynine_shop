@@ -84,7 +84,6 @@ export default async function EditarProductoPage({
           // Las imágenes ya no son un campo de texto: el formulario las
           // muestra como casillas para conservar o quitar.
           imagenes: producto.imagenes ?? [],
-          estado: producto.estado,
           seccionPortada: producto.seccion_portada,
         }}
       />

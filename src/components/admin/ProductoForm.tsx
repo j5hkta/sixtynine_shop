@@ -9,13 +9,6 @@ import {
   SECCIONES_PORTADA,
   type SeccionPortada,
 } from "@/lib/secciones";
-import type { EstadoProducto } from "@/lib/supabase/types";
-
-const ESTADOS: { valor: EstadoProducto; etiqueta: string; ayuda: string }[] = [
-  { valor: "activo", etiqueta: "Activo", ayuda: "visible en la tienda" },
-  { valor: "borrador", etiqueta: "Borrador", ayuda: "oculto, en preparación" },
-  { valor: "agotado", etiqueta: "Agotado", ayuda: "visible pero sin venta" },
-];
 
 const inputClase =
   "w-full border border-ink-line bg-ink-soft px-4 py-3 text-sm text-white transition-colors placeholder:text-neutral-600 focus:border-neon focus:outline-none";
@@ -37,7 +30,6 @@ export type ValoresProducto = {
   categoria: string;
   /** URLs públicas ya guardadas en el producto. */
   imagenes: string[];
-  estado: EstadoProducto;
   seccionPortada: SeccionPortada;
 };
 
@@ -49,7 +41,6 @@ const VACIO: ValoresProducto = {
   inventario: {},
   categoria: "",
   imagenes: [],
-  estado: "activo",
   seccionPortada: "ninguna",
 };
 
@@ -164,43 +155,23 @@ export default function ProductoForm({
         </p>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <div className="space-y-2">
-          <label htmlFor="categoria" className={labelClase}>
-            Categoría
-          </label>
-          <select
-            id="categoria"
-            name="categoria"
-            defaultValue={valores.categoria}
-            className={inputClase}
-          >
-            <option value="">Sin categoría</option>
-            {categorias.map((categoria) => (
-              <option key={categoria} value={categoria}>
-                {categoria}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="space-y-2">
-          <label htmlFor="estado" className={labelClase}>
-            Estado
-          </label>
-          <select
-            id="estado"
-            name="estado"
-            defaultValue={valores.estado}
-            className={inputClase}
-          >
-            {ESTADOS.map(({ valor, etiqueta, ayuda }) => (
-              <option key={valor} value={valor}>
-                {etiqueta} — {ayuda}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="space-y-2">
+        <label htmlFor="categoria" className={labelClase}>
+          Categoría
+        </label>
+        <select
+          id="categoria"
+          name="categoria"
+          defaultValue={valores.categoria}
+          className={inputClase}
+        >
+          <option value="">Sin categoría</option>
+          {categorias.map((categoria) => (
+            <option key={categoria} value={categoria}>
+              {categoria}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="space-y-2">
@@ -223,8 +194,8 @@ export default function ProductoForm({
         <p id="seccion-ayuda" className={ayudaClase}>
           En qué franja de la página principal aparece el producto. Es
           independiente de su categoría: puedes poner una tabla en «Completos»
-          si quieres destacarla ahí. Los productos en <code>borrador</code> no
-          salen en la portada aunque tengan sección.
+          si quieres destacarla ahí. Un producto sin unidades no sale en la
+          portada aunque tenga sección asignada.
         </p>
       </div>
 
@@ -238,6 +209,13 @@ export default function ProductoForm({
           <code>0</code> sigue apareciendo en la ficha, tachada: eso distingue
           «agotada, vuelve pronto» de «no existe». Para skates y accesorios usa
           la plantilla <strong>Sin tallas</strong>.
+        </p>
+        <p className={ayudaClase}>
+          <strong>El estado del producto ya no se elige.</strong> Lo calcula la
+          base de datos: con al menos una unidad queda <code>activo</code> y se
+          ve en la tienda; con todo a <code>0</code> pasa a <code>agotado</code>{" "}
+          y desaparece del catálogo. Es también la forma de retirar algo sin
+          borrarlo.
         </p>
       </div>
 

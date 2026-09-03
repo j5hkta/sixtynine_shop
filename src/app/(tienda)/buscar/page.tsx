@@ -49,9 +49,10 @@ async function buscarProductos(termino: string) {
     const { data, error } = await supabase
       .from("productos")
       .select("id, titulo, precio, precio_original, categoria, imagenes")
+      // `estado` es una columna generada: vale 'agotado' en cuanto el
+      // inventario llega a 0, asi que este filtro ya excluye lo que no tiene
+      // existencias. Ver `supabase/estado_automatico.sql`.
       .eq("estado", "activo")
-      // Los agotados salen de los resultados solos, sin que nadie los toque.
-      .gt("stock_total", 0)
       .ilike("titulo", `%${termino}%`)
       .order("creado_en", { ascending: false })
       .limit(MAX_RESULTADOS);

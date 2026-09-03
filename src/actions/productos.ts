@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 
 import { SECCIONES_PORTADA } from "@/lib/secciones";
-import { archivosDeFormData, subirImagenes } from "@/lib/storage";
+import { archivosDeFormData, BUCKET, subirImagenes } from "@/lib/storage";
 import { createClient } from "@/lib/supabase/server";
 import type { ProductoInsert, ProductoUpdate } from "@/lib/supabase/types";
 import {
@@ -74,7 +74,6 @@ const esquemaProducto = z
       .optional()
       .default("")
       .transform((valor) => (valor === "" ? null : valor)),
-    estado: z.enum(["activo", "borrador", "agotado"]).optional().default("activo"),
     seccion_portada: z.enum(SECCIONES_PORTADA).optional().default("ninguna"),
   })
   .refine(
@@ -272,6 +271,69 @@ export async function actualizarProducto(formData: FormData) {
 export type ResultadoBorrado = { ok: true } | { ok: false; error: string };
 
 /**
+ * Borra del bucket las imagenes que ya no use NADIE.
+ *
+ * Es imprescindible comprobarlo antes: `subirImagenes()` nombra cada objeto con
+ * el SHA-256 de su contenido, asi que la misma foto subida a dos productos —o a
+ * un producto y a un banner— es UN SOLO archivo compartido. Borrarlo a ciegas
+ * al eliminar uno dejaria al otro sin imagen, y el fallo no se veria hasta que
+ * alguien abriera esa ficha.
+ *
+ * Nunca lanza: llega despues de un borrado ya consumado, y no tiene sentido
+ * mostrar un error por unos kilobytes de mas en Storage. Los huerfanos que
+ * queden se pueden barrer a mano desde el panel de Supabase.
+ */
+async function limpiarImagenesHuerfanas(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  imagenes: string[],
+): Promise<void> {
+  if (imagenes.length === 0) return;
+
+  try {
+    // Se consulta que otras filas siguen apuntando a estas URLs. `overlaps`
+    // traduce al operador && de Postgres sobre el array `imagenes`.
+    const [otrosProductos, banners] = await Promise.all([
+      supabase
+        .from("productos")
+        .select("imagenes")
+        .overlaps("imagenes", imagenes),
+      supabase.from("banners").select("imagen_url").in("imagen_url", imagenes),
+    ]);
+
+    const enUso = new Set<string>();
+
+    for (const fila of otrosProductos.data ?? []) {
+      for (const url of fila.imagenes ?? []) enUso.add(url);
+    }
+    for (const fila of banners.data ?? []) {
+      enUso.add(fila.imagen_url);
+    }
+
+    // El nombre del objeto en el bucket es lo que sigue al prefijo publico.
+    const rutas = imagenes
+      .filter((url) => !enUso.has(url))
+      .map((url) => url.split(`/${BUCKET}/`).pop() ?? "")
+      .filter(Boolean);
+
+    if (rutas.length === 0) return;
+
+    const { error } = await supabase.storage.from(BUCKET).remove(rutas);
+
+    if (error) {
+      console.error(
+        "[productos] No se pudieron borrar las imagenes:",
+        error.message,
+      );
+    }
+  } catch (e) {
+    console.error(
+      "[productos] Fallo la limpieza de imagenes:",
+      e instanceof Error ? e.message : e,
+    );
+  }
+}
+
+/**
  * Baja de producto. Se invoca desde el listado con `bind`, de modo que el `id`
  * viaja en el closure del servidor y no en un campo manipulable del formulario.
  *
@@ -288,6 +350,16 @@ export async function eliminarProducto(id: string): Promise<ResultadoBorrado> {
 
   const supabase = await createClient();
 
+  // Las imagenes se leen ANTES del DELETE: despues la fila ya no existe y no
+  // habria forma de saber que archivos dejo huerfanos en el bucket.
+  const { data: previo } = await supabase
+    .from("productos")
+    .select("imagenes")
+    .eq("id", id)
+    .maybeSingle();
+
+  const imagenesDelProducto = previo?.imagenes ?? [];
+
   // El `.select()` es imprescindible: a diferencia del INSERT (que lanza 42501
   // al violar `with check`), un DELETE bloqueado por la clausula `using` de RLS
   // simplemente no encuentra la fila y devuelve 0 filas sin error. Sin
@@ -302,13 +374,14 @@ export async function eliminarProducto(id: string): Promise<ResultadoBorrado> {
     console.error("[productos] Error al eliminar:", error);
 
     // 23503 = violacion de clave foranea. `pedidos_items.producto_id` usa
-    // `on delete restrict` para no destruir el historial de pedidos.
+    // `on delete restrict` para no destruir el historial de pedidos: un pedido
+    // cuyo articulo desaparece deja de poder mostrarse en el panel.
     if (error.code === "23503") {
       return {
         ok: false,
         error:
           "No se puede eliminar: el producto aparece en pedidos ya registrados. " +
-          "Cambialo a estado 'borrador' para retirarlo de la tienda.",
+          "Pon todas sus tallas a 0 para retirarlo de la tienda sin romper el historial.",
       };
     }
 
@@ -325,6 +398,10 @@ export async function eliminarProducto(id: string): Promise<ResultadoBorrado> {
         "No se elimino el producto: no existe o tu cuenta no tiene permisos.",
     };
   }
+
+  // La fila ya no esta. Lo que quede por hacer con los archivos no debe poder
+  // convertir un borrado hecho en un error en pantalla.
+  await limpiarImagenesHuerfanas(supabase, imagenesDelProducto);
 
   revalidatePath(LISTADO);
   refrescarTiendaPublica();

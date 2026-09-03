@@ -12,7 +12,6 @@ export const metadata = {
 
 const estiloEstado: Record<EstadoProducto, string> = {
   activo: "border-neon/40 bg-neon/10 text-neon",
-  borrador: "border-ink-line bg-white/5 text-neutral-400",
   agotado: "border-red-500/40 bg-red-500/10 text-red-400",
 };
 
